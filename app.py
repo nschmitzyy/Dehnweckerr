@@ -2,81 +2,62 @@ import streamlit as st
 import streamlit.components.v1 as components
 import time
 
-# --- 1. KONFIGURATION ---
-# Ersetze den Link, falls dein Branch nicht 'main' heißt
+# --- 1. SETTINGS ---
+st.set_page_config(page_title="ZenStretch Wecker", page_icon="🧘", layout="centered")
+
+# --- 2. VIDEO-HINTERGRUND & DESIGN (CSS) ---
+# Link zu deinem Video auf GitHub
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 
-st.set_page_config(page_title="ZenStretch", page_icon="🧘", layout="centered")
-
-# --- 2. CSS & VIDEO BACKGROUND ---
 st.markdown(f"""
     <style>
-    /* 1. Video fixieren und den ganzen Bildschirm füllen lassen */
+    /* Fullscreen Video-Hintergrund */
     #bgVideo {{
         position: fixed;
-        top: 50%;
-        left: 50%;
+        right: 0;
+        bottom: 0;
         min-width: 100%;
         min-height: 100%;
-        width: auto;
-        height: auto;
-        z-index: -100; /* Ganz nach hinten */
-        transform: translateX(-50%) translateY(-50%);
-        object-fit: cover; /* Verhindert Verzerrungen */
-        filter: brightness(45%) contrast(110%); /* Macht es atmosphärischer */
+        z-index: -1;
+        object-fit: cover;
+        filter: brightness(50%); /* Macht das Video dunkler, damit Schrift lesbar ist */
     }}
 
-    /* 2. Streamlit-Hintergrund unsichtbar machen */
     .stApp {{
         background: transparent;
     }}
 
-    /* 3. Den Glaskasten (Main Container) zentrieren und stylen */
+    /* Die schwebende "Zen-Box" */
     .block-container {{
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(15px); /* Der coole Milchglas-Effekt */
+        background-color: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(15px);
         -webkit-backdrop-filter: blur(15px);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 25px;
-        padding: 50px !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        max-width: 600px;
-        margin: auto;
+        padding: 40px !important;
+        border-radius: 30px;
+        margin-top: 50px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }}
 
-    /* 4. Texte weiß machen für maximalen Kontrast auf dem Video */
-    h1, h2, h3, p, span, label {{
-        color: white !important;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-    }}
-    </style>
-
-    <video autoplay muted loop id="bgVideo">
-        <source src="https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4" type="video/mp4">
-        Dein Browser unterstützt das Video-Tag nicht.
-    </video>
-    """, unsafe_allow_html=True)
-
-    /* Texte & Timer */
-    h1, h3, p, .stMarkdown {{
+    /* Texte & Styling */
+    h1, h2, h3, p, label {{
         color: white !important;
         text-align: center;
-        font-family: 'Helvetica Neue', sans-serif;
-        text-shadow: 1px 1px 10px rgba(0,0,0,0.5);
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
     }}
 
     .timer-display {{
-        font-size: 120px !important;
+        font-size: 100px !important;
         font-weight: 100;
         color: white;
         text-align: center;
         margin: 20px 0;
     }}
 
-    /* Buttons & Inputs */
+    /* Buttons anpassen */
     .stButton>button {{
         width: 100%;
-        border-radius: 25px;
+        border-radius: 20px;
         background-color: rgba(255, 255, 255, 0.2);
         color: white;
         border: 1px solid white;
@@ -85,10 +66,10 @@ st.markdown(f"""
     }}
     .stButton>button:hover {{
         background-color: white;
-        color: black;
+        color: #333;
     }}
 
-    /* Verstecke Streamlit Header/Footer */
+    /* Verstecke Streamlit-Elemente */
     header, footer {{visibility: hidden;}}
     </style>
 
@@ -98,52 +79,52 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 # --- 3. APP LOGIK ---
-if 'state' not in st.session_state:
-    st.session_state.state = "SETUP" # Mögliche States: SETUP, COUNTDOWN, ALARM
+if 'status' not in st.session_state:
+    st.session_state.status = "SETUP"
 
 st.markdown("<h1>ZenStretch</h1>", unsafe_allow_html=True)
 
-# STATE: SETUP
-if st.session_state.state == "SETUP":
-    st.markdown("<h3>Wann möchtest du aus der Stille erwachen?</h3>", unsafe_allow_html=True)
+# SCHRITT 1: Einstellen
+if st.session_state.status == "SETUP":
+    st.markdown("<h3>Bereite dich auf die Einkehr vor.</h3>", unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
-        m = st.number_input("Minuten", 0, 60, 0)
+        minuten = st.number_input("Minuten", 0, 60, 0)
     with col2:
-        s = st.number_input("Sekunden", 0, 59, 10)
+        sekunden = st.number_input("Sekunden", 0, 59, 10)
     
     if st.button("Timer starten"):
-        st.session_state.duration = m * 60 + s
-        st.session_state.state = "COUNTDOWN"
+        st.session_state.gesamtzeit = minuten * 60 + sekunden
+        st.session_state.status = "COUNTDOWN"
         st.rerun()
 
-# STATE: COUNTDOWN
-elif st.session_state.state == "COUNTDOWN":
-    placeholder = st.empty()
-    for i in range(st.session_state.duration, 0, -1):
-        placeholder.markdown(f"<p class='timer-display'>{i:02d}</p>", unsafe_allow_html=True)
+# SCHRITT 2: Countdown
+elif st.session_state.status == "COUNTDOWN":
+    platzhalter = st.empty()
+    for i in range(st.session_state.gesamtzeit, 0, -1):
+        platzhalter.markdown(f"<p class='timer-display'>{i:02d}</p>", unsafe_allow_html=True)
         time.sleep(1)
-    st.session_state.state = "ALARM"
+    st.session_state.status = "ALARM"
     st.rerun()
 
-# STATE: ALARM & DEHNEN
-elif st.session_state.state == "ALARM":
-    st.markdown("<h3 style='color: #ff4b4b;'>Die Zeit ist gekommen. Erhebe dich.</h3>", unsafe_allow_html=True)
+# SCHRITT 3: Alarm & Pose-Erkennung
+elif st.session_state.status == "ALARM":
+    st.markdown("<h3 style='color: #ffcccc;'>Erhebe deine Arme zur Sonne.</h3>", unsafe_allow_html=True)
     
-    # Gong-Sound (Loop)
+    # Gong-Sound (Streamlit Audio)
     st.audio("https://cdn.pixabay.com/audio/2022/03/15/audio_206684742d.mp3", format="audio/mp3", autoplay=True)
 
-    # Browser-KI (MediaPipe JavaScript)
-    js_ui = """
+    # Browser-KI (JavaScript)
+    js_code = """
     <div style="text-align: center;">
         <div style="position: relative; display: inline-block;">
-            <video id="v" style="width: 100%; max-width: 450px; border-radius: 20px; transform: scaleX(-1);"></video>
-            <canvas id="c" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%;"></canvas>
+            <video id="webcam" style="width: 100%; max-width: 450px; border-radius: 20px; transform: scaleX(-1);"></video>
+            <canvas id="overlay" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%;"></canvas>
         </div>
-        <h2 id="msg" style="color: white; font-weight: 200; margin-top: 15px;">Arme über den Kopf!</h2>
-        <div style="width: 100%; background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; margin-top: 10px;">
-            <div id="bar" style="width: 0%; height: 100%; background: #fff; border-radius: 4px; transition: width 0.2s;"></div>
+        <h2 id="feedback" style="color: white; font-weight: 200; margin-top: 15px;">Suche Pose...</h2>
+        <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; margin-top: 10px;">
+            <div id="progress" style="width: 0%; height: 100%; background: white; border-radius: 5px; transition: width 0.2s;"></div>
         </div>
     </div>
 
@@ -151,14 +132,14 @@ elif st.session_state.state == "ALARM":
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
 
     <script>
-        const video = document.getElementById('v');
-        const canvas = document.getElementById('c');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
-        const bar = document.getElementById('bar');
-        const msg = document.getElementById('msg');
+        const bar = document.getElementById('progress');
+        const feedback = document.getElementById('feedback');
         
-        let count = 0;
-        const goal = 120; // ca. 8 Sekunden
+        let counter = 0;
+        const target = 100; // Dauer der Dehnung
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({modelComplexity: 1, minDetectionConfidence: 0.5});
@@ -166,30 +147,33 @@ elif st.session_state.state == "ALARM":
         pose.onResults(res => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (res.poseLandmarks) {
-                const lm = res.poseLandmarks;
-                // Logik: Hände (15,16) über Nase (0)
-                if (lm[15].y < lm[0].y && lm[16].y < lm[0].y) {
-                    count++;
-                    bar.style.width = (count/goal*100) + "%";
-                    msg.innerText = "Haltung erkannt...";
-                    if (count >= goal) {
-                        msg.innerText = "Erwacht. Seite wird geladen...";
+                const points = res.poseLandmarks;
+                // Check: Hände (15, 16) über Kopf-Niveau
+                if (points[15].y < points[0].y && points[16].y < points[0].y) {
+                    counter++;
+                    bar.style.width = (counter/target*100) + "%";
+                    feedback.innerText = "Haltung bewahren...";
+                    if (counter >= target) {
+                        feedback.innerText = "Du bist bereit für den Tag.";
                         setTimeout(() => { window.parent.location.reload(); }, 2000);
                     }
                 } else {
-                    if(count > 0) count -= 0.5;
-                    bar.style.width = (count/goal*100) + "%";
-                    msg.innerText = "Bitte Arme heben!";
+                    if(counter > 0) counter -= 0.5;
+                    bar.style.width = (counter/target*100) + "%";
+                    feedback.innerText = "Bitte Arme hoch!";
                 }
             }
         });
 
-        const cam = new Camera(video, {onFrame: async () => {await pose.send({image: video});}, width: 640, height: 480});
-        cam.start();
+        const camera = new Camera(video, {
+            onFrame: async () => { await pose.send({image: video}); },
+            width: 640, height: 480
+        });
+        camera.start();
     </script>
     """
-    components.html(js_ui, height=650)
+    components.html(js_code, height=650)
 
-    if st.button("Notfall: Zurück zum Start"):
-        st.session_state.state = "SETUP"
+    if st.button("Abbruch"):
+        st.session_state.status = "SETUP"
         st.rerun()
