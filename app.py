@@ -1,96 +1,107 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-import mediapipe as mp
-import cv2
-import time
-import numpy as np
-import os
-import sys
+import streamlit.components.v1 as components
 
-# --- ZEN DESIGN (Custom CSS) ---
-st.set_page_config(page_title="StretchWake", page_icon="🧘")
+# --- ZEN DESIGN ---
+st.set_page_config(page_title="StretchWake JS", page_icon="🧘")
+
 st.markdown("""
     <style>
-    .main { background-color: #F0F4F2; }
-    .stButton>button { 
-        border-radius: 20px; 
-        background-color: #A3B18A; 
-        color: white;
-        border: none;
-        padding: 10px 25px;
-    }
-    h1 { color: #3A5A40; font-family: 'Helvetica Neue', sans-serif; }
-    .stProgress > div > div > div > div { background-color: #588157; }
+    .main { background-color: #F0F4F2; color: #3A5A40; }
+    .stApp { background-color: #F0F4F2; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🧘 StretchWake")
-st.write("Dein sanfter Start in den Tag. Stell den Timer und dehne dich wach.")
-
-# --- LOGIK: WINKELBERECHNUNG ---
-def calculate_angle(a, b, c):
-    a = np.array(a)
-    b = np.array(b)
-    c = np.array(c)
-    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
-    angle = np.abs(radians*180.0/np.pi)
-    if angle > 180.0:
-        angle = 360 - angle
-    return angle
-
-# --- MEDIA PIPE POSE PROCESSOR ---
-class StretchProcessor(VideoProcessorBase):
-    def __init__(self):
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-        self.stretch_complete = False
-        self.counter = 0
-
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        img = cv2.flip(img, 1)
-        results = self.pose.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-
-        if results.pose_landmarks:
-            landmarks = results.pose_landmarks.landmark
-            
-            # Beispiel: Handgelenk (15), Schulter (11), Hüfte (23)
-            # Wir prüfen, ob der Arm für eine Dehnung über den Kopf gehoben wird
-            shoulder = [landmarks[11].x, landmarks[11].y]
-            elbow = [landmarks[13].x, landmarks[13].y]
-            wrist = [landmarks[15].x, landmarks[15].y]
-            
-            angle = calculate_angle(shoulder, elbow, wrist)
-
-            # Logik: Wenn Winkel > 150 Grad (Arm gestreckt), zähle hoch
-            if angle > 150:
-                self.counter += 1
-            
-            if self.counter > 60: # Ca. 2-3 Sekunden halten (je nach FPS)
-                self.stretch_complete = True
-
-            # Zeichne Feedback ins Bild (Optional für User)
-            cv2.putText(img, f"Stretch-Score: {self.counter}", (50, 50), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-
-        return frame
+st.subheader("Die KI läuft hier in deinem Browser – kein Server-Error!")
 
 # --- UI CONTROLS ---
-tab1, tab2 = st.tabs(["⏰ Wecker", "⏱️ Timer"])
+col1, col2 = st.columns(2)
+with col1:
+    st.info("1. Stell den Timer")
+    duration = st.number_input("Sekunden dehnen:", min_value=5, value=10)
+with col2:
+    st.info("2. Starte die Kamera")
+    start_btn = st.button("Kamera & Timer aktivieren")
 
-with tab1:
-    alarm_time = st.time_input("Wann möchtest du aufwachen?", time(7, 0))
-    if st.button("Wecker aktivieren"):
-        st.success(f"Wecker für {alarm_time} gestellt.")
+# --- DER JAVASCRIPT-BLOCK (Die Magie) ---
+# Dieser Teil lädt MediaPipe direkt im Frontend des Nutzers.
+if start_btn:
+    st.write(f"Halte deine Arme hoch, um den {duration}s Timer zu starten!")
+    
+    js_code = f"""
+    <div style="position: relative;">
+        <video id="input_video" style="width: 100%; border-radius: 15px; transform: scaleX(-1);"></video>
+        <canvas id="output_canvas" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%;"></canvas>
+        <h2 id="status" style="color: #588157; text-align: center;">Suche Pose...</h2>
+    </div>
 
-with tab2:
-    minutes = st.number_input("Minuten", min_value=0, max_value=60, value=1)
-    if st.button("Timer starten"):
-        with st.empty():
-            for seconds in range(minutes * 60, 0, -1):
-                st.metric("Verbleibende Zeit", f"{seconds // 60:02d}:{seconds % 60:02d}")
-                time.sleep(1)
-            st.warning("ALARM! Zeit zum Dehnen!")
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusText = document.getElementById('status');
+        
+        let counter = 0;
+        const targetSeconds = {duration};
+        let finished = false;
+
+        function onResults(results) {{
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
             
-            # Hier startet die Kamera-Logik
-            webrtc_streamer(key="stretch", video_processor_factory=StretchProcessor)
+            if (results.poseLandmarks) {{
+                // Zeichne die Gelenke (Feedback für User)
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {{color: '#A3B18A', lineWidth: 4}});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {{color: '#3A5A40', lineWidth: 2}});
+
+                // Logik: Arme über Schulterhöhe (Einfacher Check)
+                const leftWrist = results.poseLandmarks[15].y;
+                const rightWrist = results.poseLandmarks[16].y;
+                const nose = results.poseLandmarks[0].y;
+
+                if (leftWrist < nose && rightWrist < nose && !finished) {{
+                    counter++;
+                    statusText.innerText = "Dehnung erkannt! Halten: " + Math.floor(counter/10) + "s";
+                    
+                    if (counter >= targetSeconds * 10) {{
+                        statusText.innerText = "✅ GESCHAFFT! Du bist wach.";
+                        statusText.style.color = "blue";
+                        finished = true;
+                        // Hier könnte ein Sound-Stop Signal kommen
+                    }}
+                }} else if (!finished) {{
+                    statusText.innerText = "Hände über den Kopf zum Stoppen!";
+                }}
+            }}
+            canvasCtx.restore();
+        }}
+
+        const pose = new Pose({{locateFile: (file) => {{
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{file}}`;
+        }}}});
+
+        pose.setOptions({{
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        }});
+
+        pose.onResults(onResults);
+
+        const camera = new Camera(videoElement, {{
+            onFrame: async () => {{
+                await pose.send({{image: videoElement}});
+            }},
+            width: 640,
+            height: 480
+        }});
+        camera.start();
+    </script>
+    """
+    components.html(js_code, height=600)
