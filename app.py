@@ -4,6 +4,8 @@ import mediapipe as mp
 import cv2
 import time
 import numpy as np
+import os
+import sys
 
 # --- ZEN DESIGN (Custom CSS) ---
 st.set_page_config(page_title="StretchWake", page_icon="🧘")
