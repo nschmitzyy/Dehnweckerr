@@ -11,33 +11,51 @@ st.set_page_config(page_title="ZenStretch", page_icon="🧘", layout="centered")
 # --- 2. CSS & VIDEO BACKGROUND ---
 st.markdown(f"""
     <style>
-    /* Video-Hintergrund fixieren */
+    /* 1. Video fixieren und den ganzen Bildschirm füllen lassen */
     #bgVideo {{
         position: fixed;
-        right: 0;
-        bottom: 0;
+        top: 50%;
+        left: 50%;
         min-width: 100%;
         min-height: 100%;
-        z-index: -1;
-        object-fit: cover;
-        filter: brightness(50%); /* Dunkler für bessere Lesbarkeit */
+        width: auto;
+        height: auto;
+        z-index: -100; /* Ganz nach hinten */
+        transform: translateX(-50%) translateY(-50%);
+        object-fit: cover; /* Verhindert Verzerrungen */
+        filter: brightness(45%) contrast(110%); /* Macht es atmosphärischer */
     }}
 
+    /* 2. Streamlit-Hintergrund unsichtbar machen */
     .stApp {{
         background: transparent;
-247740_medium.mp4
     }}
 
-    /* Schwebender Glaskasten für die UI */
+    /* 3. Den Glaskasten (Main Container) zentrieren und stylen */
     .block-container {{
-        background-color: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(15px); /* Der coole Milchglas-Effekt */
+        -webkit-backdrop-filter: blur(15px);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 40px !important;
-        border-radius: 30px;
-        margin-top: 50px;
+        border-radius: 25px;
+        padding: 50px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        max-width: 600px;
+        margin: auto;
     }}
+
+    /* 4. Texte weiß machen für maximalen Kontrast auf dem Video */
+    h1, h2, h3, p, span, label {{
+        color: white !important;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+    }}
+    </style>
+
+    <video autoplay muted loop id="bgVideo">
+        <source src="https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4" type="video/mp4">
+        Dein Browser unterstützt das Video-Tag nicht.
+    </video>
+    """, unsafe_allow_html=True)
 
     /* Texte & Timer */
     h1, h3, p, .stMarkdown {{
