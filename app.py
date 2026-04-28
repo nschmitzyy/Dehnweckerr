@@ -5,7 +5,7 @@ import base64
 import os
 
 # --- 1. CONFIG & STYLE ---
-st.set_page_config(page_title="ZenStretch: Instant Alarm", layout="centered")
+st.set_page_config(page_title="ZenStretch67: Instant Alarm", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
