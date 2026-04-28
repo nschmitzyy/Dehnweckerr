@@ -5,66 +5,51 @@ import base64
 import os
 
 # --- 1. CONFIG & STYLE ---
-st.set_page_config(page_title="ZenStretch: Fullscreen", layout="centered")
+st.set_page_config(page_title="ZenStretch: Fullscreen Mode", layout="centered")
 
-# Video- und Poster-URLs
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
 
 st.markdown(f"""
     <style>
-    /* Hintergrund-Video */
     #bgVideo {{
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
         z-index: -1; object-fit: cover; filter: brightness(35%);
         background: url({POSTER_URL}) center/cover no-repeat;
     }}
     
-    /* Header und Streamlit-UI komplett entfernen */
-    [data-testid="stHeader"] {{
-        background: rgba(0,0,0,0) !important;
-        background-color: transparent !important;
-    }}
-    
-    header, footer, .stDeployButton, #MainMenu {{
-        visibility: hidden !important;
-        display: none !important;
-    }}
-    
-    /* Abstände korrigieren */
-    .block-container {{
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-    }}
-
+    [data-testid="stHeader"] {{ background: rgba(0,0,0,0) !important; }}
+    header, footer, .stDeployButton, #MainMenu {{ visibility: hidden !important; display: none !important; }}
+    .block-container {{ padding-top: 0rem !important; padding-bottom: 0rem !important; }}
     .stApp {{ background: transparent !important; }}
     
-    /* Glas-Design für die Karte */
     .main-card {{
         background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 30px; 
-        padding: 40px;
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border-radius: 30px; padding: 40px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white; 
-        text-align: center; 
-        margin-top: 2vh;
+        color: white; text-align: center; margin-top: 5vh;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     }}
     
-    /* Inputs und Buttons */
     .stButton>button {{
         width: 100%; border-radius: 50px; 
         background: rgba(255, 255, 255, 0.9); 
-        color: #000; font-weight: bold; padding: 15px;
-        border: none;
+        color: #000; font-weight: bold; padding: 15px; border: none;
     }}
     
     .stNumberInput div[data-baseweb="input"] {{
         background-color: rgba(255, 255, 255, 0.08) !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         color: white !important;
+    }}
+
+    /* Spezieller Button für Fullscreen */
+    .fs-btn {{
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        margin-top: 10px;
+        border: 1px solid rgba(255,255,255,0.3) !important;
     }}
     </style>
     
@@ -73,11 +58,9 @@ st.markdown(f"""
     </video>
     """, unsafe_allow_html=True)
 
-# Session State Initialisierung
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
-# Start der Karte
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
 # --- 2. AUDIO VORBEREITEN ---
@@ -90,12 +73,35 @@ if os.path.exists("sirene-da-monique.mp3"):
     except Exception as e:
         st.error(f"Audio-Ladefehler: {e}")
 
-# --- 3. PHASEN ---
+# --- 3. VOLLBILD-SKRIPT ---
+# Kleiner JavaScript-Helper, um den Browser-Vollbildmodus zu triggern
+def trigger_fullscreen():
+    js = """
+    <script>
+    function toggleFullScreen() {
+        var el = window.parent.document.documentElement;
+        if (!window.parent.document.fullscreenElement) {
+            el.requestFullscreen().catch(err => {
+                alert(`Fehler beim Vollbild: ${err.message}`);
+            });
+        } else {
+            window.parent.document.exitFullscreen();
+        }
+    }
+    </script>
+    <button onclick="toggleFullScreen()" style="width: 100%; border-radius: 50px; background: rgba(255, 255, 255, 0.15); color: white; font-weight: bold; padding: 12px; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; margin-bottom: 20px;">
+        🖥️ VOLLBILD AN/AUS
+    </button>
+    """
+    components.html(js, height=70)
+
+# --- 4. PHASEN ---
 
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    st.write("Fokus-Zeit einstellen (Voreinstellung 20 Min)")
+    trigger_fullscreen() # Der Button zum Tabs ausblenden
     
+    st.write("Wähle deine Zeit (Voreinstellung 20 Min)")
     col1, col2, col3 = st.columns(3)
     with col1: hrs = st.number_input("Std", 0, 23, 0)
     with col2: mins = st.number_input("Min", 0, 59, 20) 
@@ -111,7 +117,7 @@ elif st.session_state.phase == "ALARM_READY":
     <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
         <div id="countdown-area">
             <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace; margin: 20px 0;">00:00:00</p>
-            <p style="letter-spacing: 2px; opacity: 0.7;">KONZENTRATION...</p>
+            <p style="letter-spacing: 2px; opacity: 0.7;">TABS AUSGEBLENDET? KONZENTRATION...</p>
         </div>
 
         <div id="exercise-area" style="display: none;">
@@ -120,7 +126,7 @@ elif st.session_state.phase == "ALARM_READY":
             <div style="position: relative; display: inline-block; border: 2px solid rgba(255,255,255,0.3); border-radius: 20px; overflow: hidden; background: #000;">
                 <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1);" autoplay playsinline></video>
             </div>
-            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">TIEFER GEHEN!</p>
+            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">SIRENE STOPPEN DURCH VORBEUGE!</p>
         </div>
     </div>
 
@@ -163,7 +169,7 @@ elif st.session_state.phase == "ALARM_READY":
         async function startAlarmMode() {{
             countdownArea.style.display = 'none';
             exerciseArea.style.display = 'block';
-            alarm.play().catch(e => console.log("Audio Error: " + e));
+            alarm.play().catch(e => console.log(e));
             startCamera();
         }}
 
@@ -193,7 +199,7 @@ elif st.session_state.phase == "ALARM_READY":
                         }}
                     }} else {{
                         if (totalHeldMs < 30000) alarm.play().catch(()=>{{}});
-                        status.innerText = "TIEFER! BEUGE DICH!";
+                        status.innerText = "TIEFER BEUGEN!";
                         status.style.color = "#ff4b4b";
                         holdTimerDisplay.style.color = "#ff4b4b";
                     }}
