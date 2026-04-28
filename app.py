@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import time
 
 # --- 1. DESIGN & BACKGROUND ---
-st.set_page_config(page_title="ZenStretch Ultimate", layout="centered")
+st.set_page_config(page_title="ZenStretch Pro", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
@@ -18,7 +18,7 @@ st.markdown(f"""
     .stApp {{ background: transparent !important; }}
     .main-card {{
         background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(20px);
         border-radius: 30px; padding: 30px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: white; text-align: center; margin-top: 5vh;
@@ -67,22 +67,23 @@ else:
         t_placeholder.markdown(f"<p class='timer-display' style='color:#ff4b4b;'>0</p>", unsafe_allow_html=True)
         st.audio("https://cdn.pixabay.com/audio/2022/03/15/audio_206684742d.mp3", autoplay=True)
 
-        # DER ROBUSTE KAMERA-CODE
+        # DER KAMERA-CODE MIT 30s HALTE-LOGIK
         js_code = """
         <div id="cam-root" style="text-align: center; color: white; font-family: sans-serif;">
             <div id="setup-area">
-                <button id="start-btn" style="padding: 15px 30px; border-radius: 30px; border: none; background: #4CAF50; color: white; font-weight: bold; cursor: pointer;">
-                    Kamera aktivieren & Dehnung starten
+                <button id="start-btn" style="padding: 15px 30px; border-radius: 30px; border: none; background: #4CAF50; color: white; font-weight: bold; cursor: pointer; font-size: 16px;">
+                    Kamera aktivieren & 30s Dehnung starten
                 </button>
             </div>
             
             <div id="capture-area" style="display: none;">
+                <h2 id="hold-timer" style="font-size: 48px; margin: 10px 0; color: #fff;">30</h2>
                 <div style="position: relative; display: inline-block; border: 2px solid white; border-radius: 20px; overflow: hidden;">
                     <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); background: #000;" autoplay playsinline></video>
                 </div>
-                <p id="status" style="margin-top: 10px;">Initialisiere KI...</p>
-                <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden;">
-                    <div id="progress" style="width: 0%; height: 100%; background: white; transition: 0.1s;"></div>
+                <p id="status" style="margin-top: 10px; font-size: 18px;">Initialisiere KI...</p>
+                <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; margin-top: 10px;">
+                    <div id="progress" style="width: 0%; height: 100%; background: #4CAF50; transition: 0.2s;"></div>
                 </div>
             </div>
         </div>
@@ -97,8 +98,12 @@ else:
             const video = document.getElementById('vid');
             const status = document.getElementById('status');
             const bar = document.getElementById('progress');
+            const holdTimerDisplay = document.getElementById('hold-timer');
             
-            let count = 0;
+            let holdFrames = 0;
+            const targetSeconds = 30;
+            const fpsLimit = 10; // Wir drosseln auf 10 FPS
+            const targetFrames = targetSeconds * fpsLimit;
 
             startBtn.onclick = async () => {
                 setupArea.style.display = 'none';
@@ -109,20 +114,36 @@ else:
                     pose.setOptions({ modelComplexity: 0, minDetectionConfidence: 0.5 });
 
                     pose.onResults(res => {
-                        status.innerText = "Bitte Arme hoch!";
                         if (res.poseLandmarks) {
                             const lm = res.poseLandmarks;
+                            // Check: Handgelenke über der Nase
                             if (lm[15].y < lm[0].y && lm[16].y < lm[0].y) {
-                                count++;
-                                bar.style.width = (count / 1.5) + "%";
-                                status.innerText = "Haltung erkannt!";
-                                if (count >= 150) status.innerText = "FERTIG! Du kannst jetzt neustarten.";
+                                holdFrames++;
+                                
+                                // Berechne verbleibende Zeit
+                                let remaining = targetSeconds - Math.floor(holdFrames / fpsLimit);
+                                if (remaining < 0) remaining = 0;
+                                
+                                holdTimerDisplay.innerText = remaining;
+                                holdTimerDisplay.style.color = "#4CAF50";
+                                bar.style.width = (holdFrames / targetFrames * 100) + "%";
+                                status.innerText = "Haltung erkannt! Halten...";
+
+                                if (holdFrames >= targetFrames) {
+                                    status.innerText = "FERTIG! Du hast es geschafft.";
+                                    holdTimerDisplay.innerText = "✓";
+                                }
+                            } else {
+                                status.innerText = "Bitte Arme HEBEN, um den Timer fortzusetzen!";
+                                holdTimerDisplay.style.color = "#ff4b4b";
                             }
                         }
                     });
 
                     const camera = new Camera(video, {
-                        onFrame: async () => { await pose.send({image: video}); },
+                        onFrame: async () => { 
+                            await pose.send({image: video}); 
+                        },
                         width: 480, height: 360
                     });
                     await camera.start();
@@ -132,9 +153,7 @@ else:
             };
         </script>
         """
-        # Wir nutzen components.html ohne allow="camera" im Python-Teil, 
-        # da der Button-Klick im JS den Zugriff meist besser triggert.
-        components.html(js_code, height=550)
+        components.html(js_code, height=600)
 
     if st.button("🔙 Zurück zum Start / Neustart"):
         st.session_state.phase = "SETUP"
