@@ -5,7 +5,7 @@ import base64
 import os
 
 # --- 1. CONFIG & STYLE ---
-st.set_page_config(page_title="Pomodoro Strech: Instant Alarm", layout="centered")
+st.set_page_config(page_title="ZenStretch: Professional Clock", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
@@ -19,13 +19,13 @@ st.markdown(f"""
     }}
     .stApp {{ background: transparent !important; }}
     .main-card {{
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         border-radius: 30px; padding: 30px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: white; text-align: center; margin-top: 5vh;
     }}
-    .timer-display {{ font-size: 100px; font-weight: 100; font-family: monospace; margin: 10px; color: #fff; }}
+    .timer-display {{ font-size: 80px; font-weight: 100; font-family: 'Courier New', monospace; margin: 20px 0; color: #fff; }}
     .stButton>button {{
         width: 100%; border-radius: 50px; background: #ffffff; color: #000; font-weight: bold; padding: 15px;
     }}
@@ -51,35 +51,34 @@ if os.path.exists("sirene-da-monique.mp3"):
 # --- 3. PHASEN ---
 
 if st.session_state.phase == "SETUP":
-    st.title("🧘 Pomodoro Strech")
-    st.write("Der Alarm startet SOFORT nach Ablauf der Zeit.")
-    c1, c2 = st.columns(2)
-    with c1: mins = st.number_input("Minuten", 0, 60, 0)
-    with c2: secs = st.number_input("Sekunden", 0, 59, 10)
+    st.title("🧘 ZenStretch Wecker")
+    st.write("Wann soll der Alarm losgehen?")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1: hrs = st.number_input("Stunden", 0, 23, 0)
+    with col2: mins = st.number_input("Minuten", 0, 59, 0)
+    with col3: secs = st.number_input("Sekunden", 0, 59, 10)
     
     if st.button("WECKER SCHARF SCHALTEN"):
-        st.session_state.total_seconds = (mins * 60) + secs
+        st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
         st.session_state.phase = "ALARM_READY"
         st.rerun()
 
 elif st.session_state.phase == "ALARM_READY":
-    # Dieser Teil kombiniert Countdown und Kamera in einem einzigen HTML-Block,
-    # damit der Sound ohne erneutes Klicken ausgelöst werden kann.
-    
     js_code = f"""
     <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
         <div id="countdown-area">
-            <p id="big-timer" style="font-size: 100px; font-weight: 100; font-family: monospace; margin: 20px 0;">0</p>
-            <p id="hint">Bereite dich vor...</p>
+            <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace; margin: 20px 0;">00:00:00</p>
+            <p id="hint" style="letter-spacing: 2px; opacity: 0.8;">BIS ZUM ALARM</p>
         </div>
 
         <div id="exercise-area" style="display: none;">
-            <h2 style="color: #ff4b4b; margin: 0;">🚨 ALARM! 🚨</h2>
+            <h2 style="color: #ff4b4b; margin: 0; letter-spacing: 5px;">🚨 ALARM 🚨</h2>
             <h2 id="hold-timer" style="font-size: 64px; margin: 10px 0; font-family: monospace;">30.0</h2>
             <div style="position: relative; display: inline-block; border: 2px solid white; border-radius: 20px; overflow: hidden; background: #000;">
                 <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1);" autoplay playsinline></video>
             </div>
-            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b;">BEUGE DICH!</p>
+            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">BEUGE DICH NACH UNTEN!</p>
         </div>
     </div>
 
@@ -100,28 +99,31 @@ elif st.session_state.phase == "ALARM_READY":
         let timeLeft = {st.session_state.total_seconds};
         let totalHeldMs = 0;
         let lastTimestamp = Date.now();
-        let isAlarmActive = false;
 
-        // 1. COUNTDOWN STARTEN
+        // Funktion zum Formatieren der Zeit (HH:MM:SS)
+        function formatTime(s) {{
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return [h, m, sec].map(v => v < 10 ? "0" + v : v).join(":");
+        }}
+
+        // Countdown-Intervall
         const mainInterval = setInterval(() => {{
-            timeLeft--;
-            bigTimer.innerText = timeLeft;
-            
-            if (timeLeft <= 0) {{
+            if (timeLeft > 0) {{
+                timeLeft--;
+                bigTimer.innerText = formatTime(timeLeft);
+            }} else {{
                 clearInterval(mainInterval);
                 startAlarmMode();
             }}
         }}, 1000);
-        bigTimer.innerText = timeLeft;
+        bigTimer.innerText = formatTime(timeLeft);
 
         async function startAlarmMode() {{
-            isAlarmActive = true;
             countdownArea.style.display = 'none';
             exerciseArea.style.display = 'block';
-            
-            // SOFORTIGER SOUND (funktioniert, weil der User "Scharf schalten" geklickt hat)
-            alarm.play().catch(e => console.log("Audio Blocked:", e));
-            
+            alarm.play().catch(e => console.log("Audio gestoppt durch Browser-Policy."));
             startCamera();
         }}
 
@@ -142,33 +144,4 @@ elif st.session_state.phase == "ALARM_READY":
                         alarm.pause();
                         totalHeldMs += delta;
                         let rem = Math.max(0, (30000 - totalHeldMs) / 1000);
-                        holdTimerDisplay.innerText = rem.toFixed(1);
-                        holdTimerDisplay.style.color = "#4CAF50";
-                        status.innerText = "Sirene pausiert...";
-                        if (totalHeldMs >= 30000) {{
-                            status.innerText = "FERTIG!";
-                            holdTimerDisplay.innerText = "✓";
-                        }}
-                    }} else {{
-                        if (totalHeldMs < 30000) alarm.play().catch(()=>{{}});
-                        status.innerText = "TIEFER! BEUGE DICH!";
-                        holdTimerDisplay.style.color = "#ff4b4b";
-                    }}
-                }}
-            }});
-
-            const camera = new Camera(video, {{
-                onFrame: async () => {{ await pose.send({{image: video}}); }},
-                width: 480, height: 360
-            }});
-            camera.start();
-        }}
-    </script>
-    """
-    components.html(js_code, height=650)
-
-    if st.button("RESET"):
-        st.session_state.phase = "SETUP"
-        st.rerun()
-
-st.markdown('</div>', unsafe_allow_html=True)
+                        holdTimerDisplay
