@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import time
 
 # --- 1. DESIGN & BACKGROUND ---
-st.set_page_config(page_title="ZenStretch: Vorbeuge", layout="centered")
+st.set_page_config(page_title="ZenStretch: Sirenen-Modus", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
@@ -17,7 +17,7 @@ st.markdown(f"""
     }}
     .stApp {{ background: transparent !important; }}
     .main-card {{
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.65);
         backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(20px);
         border-radius: 30px; padding: 30px;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -43,7 +43,7 @@ st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    st.write("Stelle deinen Wecker ein (Übung: Vorbeuge)")
+    st.write("Stoppe die Sirene durch eine Vorbeuge!")
     c1, c2 = st.columns(2)
     with c1: mins = st.number_input("Minuten", 0, 60, 0)
     with c2: secs = st.number_input("Sekunden", 0, 59, 10)
@@ -65,13 +65,12 @@ else:
 
     if st.session_state.phase == "ALARM":
         t_placeholder.markdown(f"<p class='timer-display' style='color:#ff4b4b;'>0</p>", unsafe_allow_html=True)
-        st.audio("https://cdn.pixabay.com/audio/2022/03/15/audio_206684742d.mp3", autoplay=True)
 
         js_code = """
         <div id="cam-root" style="text-align: center; color: white; font-family: sans-serif;">
             <div id="setup-area">
-                <button id="start-btn" style="padding: 15px 30px; border-radius: 30px; border: none; background: #4CAF50; color: white; font-weight: bold; cursor: pointer; font-size: 16px;">
-                    Kamera aktivieren & Vorbeuge starten (30s)
+                <button id="start-btn" style="padding: 15px 30px; border-radius: 30px; border: none; background: #ff4b4b; color: white; font-weight: bold; cursor: pointer; font-size: 16px;">
+                    KLICKEN ZUM AKTIVIEREN (Sirene & Kamera)
                 </button>
             </div>
             
@@ -80,7 +79,7 @@ else:
                 <div style="position: relative; display: inline-block; border: 2px solid white; border-radius: 20px; overflow: hidden;">
                     <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); background: #000;" autoplay playsinline></video>
                 </div>
-                <p id="status" style="margin-top: 10px; font-size: 18px; height: 24px;">Bereit machen...</p>
+                <p id="status" style="margin-top: 10px; font-size: 18px; height: 24px;">Beuge dich nach unten!</p>
                 <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; margin-top: 10px;">
                     <div id="progress" style="width: 0%; height: 100%; background: #4CAF50; transition: width 0.1s linear;"></div>
                 </div>
@@ -99,33 +98,39 @@ else:
             const bar = document.getElementById('progress');
             const holdTimerDisplay = document.getElementById('hold-timer');
             
+            // Audio laden
+            const alarm = new Audio('sirene-da-monique.mp3');
+            alarm.loop = true;
+
             let totalHeldMs = 0;
             let lastTimestamp = Date.now();
             const targetMs = 30000;
+            let isFinished = false;
 
             startBtn.onclick = async () => {
                 setupArea.style.display = 'none';
                 captureArea.style.display = 'block';
+                alarm.play(); // Sirene startet sofort
                 
                 try {
                     const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
                     pose.setOptions({ modelComplexity: 0, minDetectionConfidence: 0.5 });
 
                     pose.onResults(res => {
+                        if (isFinished) return;
+
                         const now = Date.now();
                         const deltaTime = now - lastTimestamp;
                         lastTimestamp = now;
 
                         if (res.poseLandmarks) {
                             const lm = res.poseLandmarks;
-                            
-                            // Logik für Vorbeuge:
-                            // In MediaPipe ist Y=0 oben und Y=1 unten im Bild.
-                            // Kopf (0) muss tiefer im Bild sein (größeres Y) als die Hüfte (23/24).
                             const noseY = lm[0].y;
                             const hipY = (lm[23].y + lm[24].y) / 2;
 
-                            if (noseY > hipY + 0.05) { // Puffer von 5%, damit man wirklich tief geht
+                            // Logik: Kopf tiefer als Hüfte
+                            if (noseY > hipY + 0.05) {
+                                alarm.pause(); // SIRENE PAUSIERT BEIM DEHNEN
                                 totalHeldMs += deltaTime;
                                 
                                 let remaining = (targetMs - totalHeldMs) / 1000;
@@ -134,14 +139,17 @@ else:
                                 holdTimerDisplay.innerText = remaining.toFixed(1);
                                 holdTimerDisplay.style.color = "#4CAF50";
                                 bar.style.width = (totalHeldMs / targetMs * 100) + "%";
-                                status.innerText = "Vorbeuge erkannt! Halten...";
+                                status.innerText = "Sirene gestoppt... Halten!";
 
                                 if (totalHeldMs >= targetMs) {
-                                    status.innerText = "HERVORRAGEND! Du bist bereit für den Tag.";
+                                    isFinished = true;
+                                    alarm.pause();
+                                    status.innerText = "FERTIG! Sirene dauerhaft aus.";
                                     holdTimerDisplay.innerText = "✓";
                                 }
                             } else {
-                                status.innerText = "Beuge dich tiefer nach unten!";
+                                if (!isFinished) alarm.play(); // SIRENE SPIELT, WENN MAN NICHT DEHNT
+                                status.innerText = "TIEFER! Beuge dich, um die Sirene zu stoppen!";
                                 holdTimerDisplay.style.color = "#ff4b4b";
                             }
                         }
