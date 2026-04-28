@@ -5,7 +5,7 @@ import base64
 import os
 
 # --- 1. CONFIG & STYLE ---
-st.set_page_config(page_title="ZenStretch: Fullscreen Mode", layout="centered")
+st.set_page_config(page_title="ZenStretch", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
@@ -44,12 +44,12 @@ st.markdown(f"""
         color: white !important;
     }}
 
-    /* Spezieller Button für Fullscreen */
-    .fs-btn {{
-        background: rgba(255, 255, 255, 0.2) !important;
-        color: white !important;
-        margin-top: 10px;
-        border: 1px solid rgba(255,255,255,0.3) !important;
+    /* Container für den schwebenden Button rechts oben */
+    .fs-container {{
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
     }}
     </style>
     
@@ -61,9 +61,42 @@ st.markdown(f"""
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
+# --- 2. VOLLBILD BUTTON RECHTS OBEN ---
+fs_html = """
+<div style="position: fixed; top: 15px; right: 15px; z-index: 10000;">
+    <button onclick="toggleFS()" style="
+        width: 45px; height: 45px; 
+        border-radius: 50%; 
+        border: 1px solid rgba(255,255,255,0.3); 
+        background: rgba(255,255,255,0.1); 
+        color: white; 
+        font-size: 20px; 
+        cursor: pointer; 
+        backdrop-filter: blur(10px);
+        display: flex; align-items: center; justify-content: center;
+        transition: 0.3s;
+    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+        ⛶
+    </button>
+</div>
+
+<script>
+function toggleFS() {
+    var doc = window.parent.document;
+    var el = doc.documentElement;
+    if (!doc.fullscreenElement) {
+        el.requestFullscreen().catch(err => { console.log(err); });
+    } else {
+        doc.exitFullscreen();
+    }
+}
+</script>
+"""
+components.html(fs_html, height=70)
+
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
-# --- 2. AUDIO VORBEREITEN ---
+# --- 3. AUDIO VORBEREITEN ---
 audio_html_src = ""
 if os.path.exists("sirene-da-monique.mp3"):
     try:
@@ -73,35 +106,12 @@ if os.path.exists("sirene-da-monique.mp3"):
     except Exception as e:
         st.error(f"Audio-Ladefehler: {e}")
 
-# --- 3. VOLLBILD-SKRIPT ---
-# Kleiner JavaScript-Helper, um den Browser-Vollbildmodus zu triggern
-def trigger_fullscreen():
-    js = """
-    <script>
-    function toggleFullScreen() {
-        var el = window.parent.document.documentElement;
-        if (!window.parent.document.fullscreenElement) {
-            el.requestFullscreen().catch(err => {
-                alert(`Fehler beim Vollbild: ${err.message}`);
-            });
-        } else {
-            window.parent.document.exitFullscreen();
-        }
-    }
-    </script>
-    <button onclick="toggleFullScreen()" style="width: 100%; border-radius: 50px; background: rgba(255, 255, 255, 0.15); color: white; font-weight: bold; padding: 12px; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; margin-bottom: 20px;">
-        🖥️ VOLLBILD AN/AUS
-    </button>
-    """
-    components.html(js, height=70)
-
 # --- 4. PHASEN ---
 
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    trigger_fullscreen() # Der Button zum Tabs ausblenden
+    st.write("Fokus-Zeit (Standard 20 Min)")
     
-    st.write("Wähle deine Zeit (Voreinstellung 20 Min)")
     col1, col2, col3 = st.columns(3)
     with col1: hrs = st.number_input("Std", 0, 23, 0)
     with col2: mins = st.number_input("Min", 0, 59, 20) 
@@ -126,7 +136,7 @@ elif st.session_state.phase == "ALARM_READY":
             <div style="position: relative; display: inline-block; border: 2px solid rgba(255,255,255,0.3); border-radius: 20px; overflow: hidden; background: #000;">
                 <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1);" autoplay playsinline></video>
             </div>
-            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">SIRENE STOPPEN DURCH VORBEUGE!</p>
+            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">TIEFER GEHEN!</p>
         </div>
     </div>
 
@@ -199,7 +209,7 @@ elif st.session_state.phase == "ALARM_READY":
                         }}
                     }} else {{
                         if (totalHeldMs < 30000) alarm.play().catch(()=>{{}});
-                        status.innerText = "TIEFER BEUGEN!";
+                        status.innerText = "TIEFER GEHEN!";
                         status.style.color = "#ff4b4b";
                         holdTimerDisplay.style.color = "#ff4b4b";
                     }}
