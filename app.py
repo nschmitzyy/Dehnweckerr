@@ -51,7 +51,7 @@ if os.path.exists("sirene-da-monique.mp3"):
 # --- 3. PHASEN ---
 
 if st.session_state.phase == "SETUP":
-    st.title("🧘 ZenStretch")
+    st.title("🧘 ZenStretch67")
     st.write("Der Alarm startet SOFORT nach Ablauf der Zeit.")
     c1, c2 = st.columns(2)
     with c1: mins = st.number_input("Minuten", 0, 60, 0)
