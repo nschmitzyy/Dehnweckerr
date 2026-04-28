@@ -12,23 +12,42 @@ POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=
 
 st.markdown(f"""
     <style>
+    /* 1. Hintergrund Video */
     #bgVideo {{
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
         z-index: -1; object-fit: cover; filter: brightness(35%);
         background: url({POSTER_URL}) center/cover no-repeat;
     }}
     
-    [data-testid="stHeader"] {{ background: rgba(0,0,0,0) !important; }}
-    header, footer, .stDeployButton, #MainMenu {{ visibility: hidden !important; display: none !important; }}
-    .block-container {{ padding-top: 0rem !important; padding-bottom: 0rem !important; }}
+    /* 2. DER ULTIMATIVE HEADER-KILLER */
+    /* Wir blenden alle moeglichen Header-Elemente aus und setzen Abstaende auf 0 */
+    [data-testid="stHeader"], 
+    header, 
+    .st-emotion-cache-18ni7ap, 
+    .st-emotion-cache-h5rgaw,
+    .st-emotion-cache-6qob1r {{
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        background: transparent !important;
+    }}
+    
+    /* Entfernt den weissen Balken oben und das Padding */
+    .block-container {{
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        margin-top: -50px !important; /* Schiebt alles nach oben um den Header-Platz zu füllen */
+    }}
+    
     .stApp {{ background: transparent !important; }}
     
+    /* Glas-Design Karte */
     .main-card {{
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         border-radius: 30px; padding: 40px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white; text-align: center; margin-top: 5vh;
+        color: white; text-align: center; margin-top: 2vh;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     }}
     
@@ -43,14 +62,6 @@ st.markdown(f"""
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         color: white !important;
     }}
-
-    /* Container für den schwebenden Button rechts oben */
-    .fs-container {{
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
-    }}
     </style>
     
     <video autoplay muted loop playsinline id="bgVideo">
@@ -63,23 +74,19 @@ if 'phase' not in st.session_state:
 
 # --- 2. VOLLBILD BUTTON RECHTS OBEN ---
 fs_html = """
-<div style="position: fixed; top: 15px; right: 15px; z-index: 10000;">
+<div style="position: fixed; top: 10px; right: 10px; z-index: 10000;">
     <button onclick="toggleFS()" style="
-        width: 45px; height: 45px; 
+        width: 40px; height: 40px; 
         border-radius: 50%; 
-        border: 1px solid rgba(255,255,255,0.3); 
+        border: 1px solid rgba(255,255,255,0.2); 
         background: rgba(255,255,255,0.1); 
         color: white; 
-        font-size: 20px; 
+        font-size: 18px; 
         cursor: pointer; 
         backdrop-filter: blur(10px);
         display: flex; align-items: center; justify-content: center;
-        transition: 0.3s;
-    " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
-        ⛶
-    </button>
+    ">⛶</button>
 </div>
-
 <script>
 function toggleFS() {
     var doc = window.parent.document;
@@ -92,7 +99,7 @@ function toggleFS() {
 }
 </script>
 """
-components.html(fs_html, height=70)
+components.html(fs_html, height=60)
 
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
@@ -103,15 +110,12 @@ if os.path.exists("sirene-da-monique.mp3"):
         with open("sirene-da-monique.mp3", "rb") as f:
             b64 = base64.b64encode(f.read()).decode()
             audio_html_src = f"data:audio/mp3;base64,{b64}"
-    except Exception as e:
-        st.error(f"Audio-Ladefehler: {e}")
+    except: pass
 
-# --- 4. PHASEN ---
-
+# --- 4. LOGIK ---
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    st.write("Fokus-Zeit (Standard 20 Min)")
-    
+    st.write("Fokus-Zeit (20 Min Voreinstellung)")
     col1, col2, col3 = st.columns(3)
     with col1: hrs = st.number_input("Std", 0, 23, 0)
     with col2: mins = st.number_input("Min", 0, 59, 20) 
@@ -129,20 +133,15 @@ elif st.session_state.phase == "ALARM_READY":
             <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace; margin: 20px 0;">00:00:00</p>
             <p style="letter-spacing: 2px; opacity: 0.7;">TABS AUSGEBLENDET? KONZENTRATION...</p>
         </div>
-
         <div id="exercise-area" style="display: none;">
             <h2 style="color: #ff4b4b; margin: 0; letter-spacing: 5px;">🚨 ALARM 🚨</h2>
             <h2 id="hold-timer" style="font-size: 64px; margin: 10px 0; font-family: monospace;">30.0</h2>
-            <div style="position: relative; display: inline-block; border: 2px solid rgba(255,255,255,0.3); border-radius: 20px; overflow: hidden; background: #000;">
-                <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1);" autoplay playsinline></video>
-            </div>
+            <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px;" autoplay playsinline></video>
             <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">TIEFER GEHEN!</p>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
     <script>
         const bigTimer = document.getElementById('big-timer');
         const countdownArea = document.getElementById('countdown-area');
@@ -150,21 +149,17 @@ elif st.session_state.phase == "ALARM_READY":
         const holdTimerDisplay = document.getElementById('hold-timer');
         const status = document.getElementById('status');
         const video = document.getElementById('vid');
-
         const alarm = new Audio("{audio_html_src}");
         alarm.loop = true;
-
         let timeLeft = {st.session_state.total_seconds};
         let totalHeldMs = 0;
         let lastTimestamp = Date.now();
-
         function formatTime(s) {{
             const h = Math.floor(s / 3600);
             const m = Math.floor((s % 3600) / 60);
             const sec = s % 60;
             return [h, m, sec].map(v => v < 10 ? "0" + v : v).join(":");
         }}
-
         const mainInterval = setInterval(() => {{
             if (timeLeft > 0) {{
                 timeLeft--;
@@ -175,27 +170,22 @@ elif st.session_state.phase == "ALARM_READY":
             }}
         }}, 1000);
         bigTimer.innerText = formatTime(timeLeft);
-
         async function startAlarmMode() {{
             countdownArea.style.display = 'none';
             exerciseArea.style.display = 'block';
             alarm.play().catch(e => console.log(e));
             startCamera();
         }}
-
         async function startCamera() {{
             const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
             pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
-
             pose.onResults(res => {{
                 const now = Date.now();
                 const delta = now - lastTimestamp;
                 lastTimestamp = now;
-
                 if (res.poseLandmarks) {{
                     const noseY = res.poseLandmarks[0].y;
                     const hipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y) / 2;
-
                     if (noseY > hipY + 0.05) {{
                         alarm.pause();
                         totalHeldMs += delta;
@@ -215,7 +205,6 @@ elif st.session_state.phase == "ALARM_READY":
                     }}
                 }}
             }});
-
             const camera = new Camera(video, {{
                 onFrame: async () => {{ await pose.send({{image: video}}); }},
                 width: 480, height: 360
@@ -225,7 +214,6 @@ elif st.session_state.phase == "ALARM_READY":
     </script>
     """
     components.html(js_code, height=650)
-
     if st.button("RESET"):
         st.session_state.phase = "SETUP"
         st.rerun()
