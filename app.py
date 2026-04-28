@@ -17,7 +17,7 @@ st.markdown(f"""
     }}
     .stApp {{ background: transparent !important; }}
     .main-card {{
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.55);
         backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(20px);
         border-radius: 30px; padding: 30px;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -26,7 +26,7 @@ st.markdown(f"""
     .timer-display {{ font-size: 100px; font-weight: 100; font-family: monospace; margin: 10px; color: #fff; }}
     header, footer {{ visibility: hidden !important; }}
     .stButton>button {{
-        width: 100%; border-radius: 50px; background: white; color: black; font-weight: bold; border: none; padding: 10px;
+        width: 100%; border-radius: 50px; background: white; color: black; font-weight: bold; border: none; padding: 12px; margin-top: 10px;
     }}
     </style>
     <video autoplay muted loop playsinline id="bgVideo" poster="{POSTER_URL}">
@@ -67,7 +67,6 @@ else:
         t_placeholder.markdown(f"<p class='timer-display' style='color:#ff4b4b;'>0</p>", unsafe_allow_html=True)
         st.audio("https://cdn.pixabay.com/audio/2022/03/15/audio_206684742d.mp3", autoplay=True)
 
-        # DER KAMERA-CODE MIT 30s HALTE-LOGIK
         js_code = """
         <div id="cam-root" style="text-align: center; color: white; font-family: sans-serif;">
             <div id="setup-area">
@@ -77,13 +76,13 @@ else:
             </div>
             
             <div id="capture-area" style="display: none;">
-                <h2 id="hold-timer" style="font-size: 48px; margin: 10px 0; color: #fff;">30</h2>
+                <h2 id="hold-timer" style="font-size: 64px; margin: 10px 0; font-family: monospace;">30.0</h2>
                 <div style="position: relative; display: inline-block; border: 2px solid white; border-radius: 20px; overflow: hidden;">
                     <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); background: #000;" autoplay playsinline></video>
                 </div>
-                <p id="status" style="margin-top: 10px; font-size: 18px;">Initialisiere KI...</p>
+                <p id="status" style="margin-top: 10px; font-size: 18px; height: 24px;">Initialisiere...</p>
                 <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; margin-top: 10px;">
-                    <div id="progress" style="width: 0%; height: 100%; background: #4CAF50; transition: 0.2s;"></div>
+                    <div id="progress" style="width: 0%; height: 100%; background: #4CAF50; transition: width 0.1s linear;"></div>
                 </div>
             </div>
         </div>
@@ -100,10 +99,9 @@ else:
             const bar = document.getElementById('progress');
             const holdTimerDisplay = document.getElementById('hold-timer');
             
-            let holdFrames = 0;
-            const targetSeconds = 30;
-            const fpsLimit = 10; // Wir drosseln auf 10 FPS
-            const targetFrames = targetSeconds * fpsLimit;
+            let totalHeldMs = 0;
+            let lastTimestamp = Date.now();
+            const targetMs = 30000; // 30 Sekunden
 
             startBtn.onclick = async () => {
                 setupArea.style.display = 'none';
@@ -114,36 +112,50 @@ else:
                     pose.setOptions({ modelComplexity: 0, minDetectionConfidence: 0.5 });
 
                     pose.onResults(res => {
+                        const now = Date.now();
+                        const deltaTime = now - lastTimestamp;
+                        lastTimestamp = now;
+
                         if (res.poseLandmarks) {
                             const lm = res.poseLandmarks;
-                            // Check: Handgelenke über der Nase
-                            if (lm[15].y < lm[0].y && lm[16].y < lm[0].y) {
-                                holdFrames++;
+                            
+                            // Logik: "Nach vorne gestreckt" 
+                            // Wir prüfen, ob die Handgelenke (15, 16) ungefähr auf Höhe der Schultern (11, 12) sind.
+                            const leftShoulderY = lm[11].y;
+                            const rightShoulderY = lm[12].y;
+                            const avgShoulderY = (leftShoulderY + rightShoulderY) / 2;
+                            
+                            const leftWristY = lm[15].y;
+                            const rightWristY = lm[16].y;
+
+                            // Toleranz: Handgelenke müssen innerhalb von +/- 15% der Körperhöhe um die Schulterlinie liegen
+                            const diffLeft = Math.abs(leftWristY - avgShoulderY);
+                            const diffRight = Math.abs(rightWristY - avgShoulderY);
+
+                            if (diffLeft < 0.15 && diffRight < 0.15) {
+                                totalHeldMs += deltaTime;
                                 
-                                // Berechne verbleibende Zeit
-                                let remaining = targetSeconds - Math.floor(holdFrames / fpsLimit);
+                                let remaining = (targetMs - totalHeldMs) / 1000;
                                 if (remaining < 0) remaining = 0;
                                 
-                                holdTimerDisplay.innerText = remaining;
+                                holdTimerDisplay.innerText = remaining.toFixed(1);
                                 holdTimerDisplay.style.color = "#4CAF50";
-                                bar.style.width = (holdFrames / targetFrames * 100) + "%";
-                                status.innerText = "Haltung erkannt! Halten...";
+                                bar.style.width = (totalHeldMs / targetMs * 100) + "%";
+                                status.innerText = "Haltung perfekt! Halten...";
 
-                                if (holdFrames >= targetFrames) {
-                                    status.innerText = "FERTIG! Du hast es geschafft.";
+                                if (totalHeldMs >= targetMs) {
+                                    status.innerText = "FERTIG! Du bist wach.";
                                     holdTimerDisplay.innerText = "✓";
                                 }
                             } else {
-                                status.innerText = "Bitte Arme HEBEN, um den Timer fortzusetzen!";
+                                status.innerText = "Strecke die Arme gerade nach vorne!";
                                 holdTimerDisplay.style.color = "#ff4b4b";
                             }
                         }
                     });
 
                     const camera = new Camera(video, {
-                        onFrame: async () => { 
-                            await pose.send({image: video}); 
-                        },
+                        onFrame: async () => { await pose.send({image: video}); },
                         width: 480, height: 360
                     });
                     await camera.start();
@@ -155,7 +167,7 @@ else:
         """
         components.html(js_code, height=600)
 
-    if st.button("🔙 Zurück zum Start / Neustart"):
+    if st.button("🔙 Zurück zum Start / Reset"):
         st.session_state.phase = "SETUP"
         st.rerun()
 
