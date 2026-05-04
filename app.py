@@ -65,16 +65,12 @@ st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    
-    # Auswahl der Übung
     stretch_choice = st.radio("Wähle deine Pose:", ["Vorbeuge (Rücken & Beine)", "Herabschauender Hund (Bloodflow)"])
-    
     st.write("Timer einstellen:")
     col1, col2, col3 = st.columns(3)
     hrs = col1.number_input("Std", 0, 23, 0)
     mins = col2.number_input("Min", 0, 59, 20)
     secs = col3.number_input("Sek", 0, 59, 0)
-    
     if st.button("SCHARF SCHALTEN"):
         st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
         st.session_state.mode = "DOG" if "Hund" in stretch_choice else "FORWARD"
@@ -91,7 +87,12 @@ elif st.session_state.phase == "ALARM_READY":
         <div id="exercise-area" style="display: none;">
             <h2 style="color: #ff4b4b;">🚨 ZEIT ZUM DEHNEN! 🚨</h2>
             <h2 id="hold-timer" style="font-size: 64px; font-family: monospace;">30.0</h2>
-            <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
+            
+            <div style="position: relative; display: inline-block;">
+                <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
+                <button onclick="switchCamera()" style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">🔄 Kamera</button>
+            </div>
+            
             <p id="status" style="margin-top: 10px; font-size: 20px; font-weight: bold;"></p>
         </div>
     </div>
@@ -101,9 +102,13 @@ elif st.session_state.phase == "ALARM_READY":
         const mode = "{st.session_state.mode}";
         const holdTimerDisplay = document.getElementById('hold-timer');
         const status = document.getElementById('status');
+        const video = document.getElementById('vid');
         const alarm = new Audio("{audio_html_src}"); alarm.loop = true;
+        
         let timeLeft = {st.session_state.total_seconds};
         let stretchMs = 0; let lastTs = Date.now();
+        let currentFacingMode = "user"; // Startet mit Frontkamera
+        let cameraObj = null;
 
         const timerInt = setInterval(() => {{
             if (timeLeft > 0) {{
@@ -125,15 +130,13 @@ elif st.session_state.phase == "ALARM_READY":
                 if (!res.poseLandmarks) return;
 
                 const noseY = res.poseLandmarks[0].y;
-                const lHipY = res.poseLandmarks[23].y;
-                const rHipY = res.poseLandmarks[24].y;
-                const avgHipY = (lHipY + rHipY) / 2;
+                const avgHipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y) / 2;
 
                 let isStretching = false;
                 if (mode === "FORWARD") {{
                     if (noseY > avgHipY + 0.05) isStretching = true;
                     status.innerText = isStretching ? "Sirene pausiert..." : "TIEFER BEUGEN!";
-                }} else {{ // DOG MODE
+                }} else {{
                     if (avgHipY < noseY - 0.1) isStretching = true;
                     status.innerText = isStretching ? "Gute Form! Halten..." : "HÜFTE HÖHER! (V-Form)";
                 }}
@@ -149,10 +152,22 @@ elif st.session_state.phase == "ALARM_READY":
                     holdTimerDisplay.style.color = "#ff4b4b";
                 }}
             }});
-            new Camera(document.getElementById('vid'), {{
-                onFrame: async () => {{ await pose.send({{image: document.getElementById('vid')}}); }},
-                width: 480, height: 360
-            }}).start();
+
+            if (cameraObj) await cameraObj.stop();
+            
+            cameraObj = new Camera(video, {{
+                onFrame: async () => {{ await pose.send({{image: video}}); }},
+                width: 1280, height: 720,
+                facingMode: currentFacingMode
+            }});
+            cameraObj.start();
+        }}
+
+        function switchCamera() {{
+            currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+            // Spiegeleffekt bei Rückkamera ausschalten
+            video.style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
+            startCamera();
         }}
     </script>
     """
