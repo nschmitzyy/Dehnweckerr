@@ -1,29 +1,9 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import base64
 import os
-import json
-from datetime import datetime
-import pandas as pd
 
-# --- 1. DATENVERWALTUNG ---
-LOG_FILE = "study_log.json"
-
-def load_data():
-    if os.path.exists(LOG_FILE):
-        try:
-            with open(LOG_FILE, "r") as f:
-                return json.load(f)
-        except: return []
-    return []
-
-def save_study_session(minutes, summary):
-    data = load_data()
-    today = datetime.now().strftime("%Y-%m-%d %H:%M")
-    data.append({"date": today, "minutes": round(minutes, 1), "summary": summary})
-    with open(LOG_FILE, "w") as f:
-        json.dump(data, f)
-
-# --- 2. CONFIG & STYLE ---
+# --- 1. CONFIG & STYLE ---
 st.set_page_config(page_title="ZenStretch", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
@@ -31,170 +11,190 @@ POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=
 
 st.markdown(f"""
     <style>
+    /* Hintergrund Video */
     #bgVideo {{
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
         z-index: -1; object-fit: cover; filter: brightness(35%);
         background: url({POSTER_URL}) center/cover no-repeat;
     }}
-    [data-testid="stHeader"], header {{ display: none !important; }}
+    
+    /* Header-Killer */
+    [data-testid="stHeader"], header, .st-emotion-cache-18ni7ap {{
+        display: none !important; visibility: hidden !important;
+    }}
+    
+    .block-container {{ 
+        padding-top: 0rem !important; 
+        margin-top: -50px !important; 
+    }}
+    
     .stApp {{ background: transparent !important; }}
     
-    .fullscreen-btn {{
-        position: fixed; top: 20px; right: 20px; z-index: 10000;
-        background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);
-        border: 2px solid white; color: white; padding: 12px 20px;
-        border-radius: 15px; cursor: pointer; font-weight: bold;
-    }}
-
+    /* Glas-Design Karte */
     .main-card {{
-        background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px);
-        border-radius: 30px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px); 
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 30px; padding: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
         color: white; text-align: center; margin-top: 5vh;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     }}
-    .stButton>button {{ width: 100%; border-radius: 50px; background: white; color: black; font-weight: bold; }}
+    
+    .stButton>button {{
+        width: 100%; border-radius: 50px; 
+        background: rgba(255, 255, 255, 0.9); 
+        color: #000; font-weight: bold; padding: 15px; border: none;
+    }}
+    
+    .stNumberInput div[data-baseweb="input"] {{
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+    }}
     </style>
     
-    <video autoplay muted loop playsinline id="bgVideo"><source src="{VIDEO_URL}" type="video/mp4"></video>
-    
-    <button class="fullscreen-btn" onclick="openFullscreen()">⛶ VOLLBILD AKTIVIEREN</button>
-
-    <script>
-    function openFullscreen() {{
-        var elem = document.documentElement;
-        if (elem.requestFullscreen) {{
-            elem.requestFullscreen();
-        }} else if (elem.webkitRequestFullscreen) {{ /* Safari */
-            elem.webkitRequestFullscreen();
-        }} else if (elem.msRequestFullscreen) {{ /* IE11 */
-            elem.msRequestFullscreen();
-        }}
-    }}
-    </script>
+    <video autoplay muted loop playsinline id="bgVideo">
+        <source src="{VIDEO_URL}" type="video/mp4">
+    </video>
     """, unsafe_allow_html=True)
 
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
-audio_html_src = ""
-if os.path.exists("sirene-da-monique.mp3"):
-    with open("sirene-da-monique.mp3", "rb") as f:
-        audio_html_src = f"data:audio/mp3;base64,{base64.b64encode(f.read()).decode()}"
+# --- 2. VOLLBILD BUTTON RECHTS OBEN ---
+fs_html = """
+<div style="position: fixed; top: 10px; right: 10px; z-index: 10000;">
+    <button onclick="toggleFS()" style="
+        width: 40px; height: 40px; border-radius: 50%; 
+        border: 1px solid rgba(255,255,255,0.2); 
+        background: rgba(255,255,255,0.1); color: white; 
+        cursor: pointer; backdrop-filter: blur(10px);
+        display: flex; align-items: center; justify-content: center;
+    ">⛶</button>
+</div>
+<script>
+function toggleFS() {
+    var doc = window.parent.document;
+    if (!doc.fullscreenElement) doc.documentElement.requestFullscreen();
+    else doc.exitFullscreen();
+}
+</script>
+"""
+components.html(fs_html, height=60)
 
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
-# --- 3. PHASEN ---
+# --- 3. AUDIO VORBEREITEN ---
+audio_html_src = ""
+if os.path.exists("sirene-da-monique.mp3"):
+    try:
+        with open("sirene-da-monique.mp3", "rb") as f:
+            audio_html_src = f"data:audio/mp3;base64,{base64.b64encode(f.read()).decode()}"
+    except: pass
 
+# --- 4. PHASEN ---
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    raw_data = load_data()
-    if raw_data:
-        df = pd.DataFrame(raw_data)
-        st.bar_chart(df.groupby(pd.to_datetime(df['date']).dt.date)['minutes'].sum(), height=150)
-
-    st.markdown("---")
-    stretch_choice = st.radio("Fokus:", ["Vorbeuge", "Hund"])
-    c1, c2, c3 = st.columns(3)
-    hrs, mins, secs = c1.number_input("H",0,23,0), c2.number_input("M",0,59,20), c3.number_input("S",0,59,0)
+    st.write("Wann soll der Wecker klingeln?")
     
-    if st.button("LERNEN STARTEN"):
+    col1, col2, col3 = st.columns(3)
+    hrs = col1.number_input("Std", 0, 23, 0)
+    mins = col2.number_input("Min", 0, 59, 20) 
+    secs = col3.number_input("Sek", 0, 59, 0)
+    
+    if st.button("SCHARF SCHALTEN"):
         st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
-        st.session_state.mode = "DOG" if "Hund" in stretch_choice else "FORWARD"
-        st.session_state.current_minutes = (hrs * 60) + mins + (secs / 60)
         st.session_state.phase = "ALARM_READY"
         st.rerun()
 
 elif st.session_state.phase == "ALARM_READY":
-    # WICHTIG: Wir bauen den HTML-Code für die Kamera hier zusammen
-    camera_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    </head>
-    <body style="margin:0; background:transparent; color:white; font-family:sans-serif; text-align:center;">
+    js_code = f"""
+    <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
         <div id="countdown-area">
-            <h1 id="timer" style="font-size:80px; margin:20px 0;">00:00:00</h1>
+            <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace; margin: 20px 0;">00:00:00</p>
+            <p style="opacity: 0.7; letter-spacing: 2px;">KONZENTRATION...</p>
         </div>
-        <div id="exercise-area" style="display:none;">
-            <h2 id="ht" style="font-size:60px; color:#ff4b4b;">30.0</h2>
-            <div style="position:relative; display:inline-block;">
-                <video id="v" style="width:90%; max-width:400px; border-radius:20px; border:3px solid white; transform:scaleX(-1);" autoplay playsinline></video>
-                <button onclick="switchC()" style="position:absolute; bottom:20px; right:30px; width:50px; height:50px; border-radius:50%; background:rgba(0,0,0,0.6); color:white; border:none; font-size:24px;">🔄</button>
-            </div>
+
+        <div id="exercise-area" style="display: none;">
+            <h2 style="color: #ff4b4b; margin: 0; letter-spacing: 5px;">🚨 ALARM 🚨</h2>
+            <h2 id="hold-timer" style="font-size: 64px; margin: 10px 0; font-family: monospace;">30.0</h2>
+            <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
+            <p id="status" style="margin-top: 10px; font-size: 18px; color: #ff4b4b; font-weight: bold;">TIEFER GEHEN!</p>
         </div>
-        <script>
-            const alarm = new Audio("{audio_html_src}"); alarm.loop = true;
-            let sec = {st.session_state.total_seconds};
-            let ms = 0; let last = Date.now();
-            let mode = "{st.session_state.mode}";
-            let face = "user"; let cam = null;
+    </div>
 
-            const countdown = setInterval(() => {{
-                if(sec > 0) {{
-                    sec--;
-                    document.getElementById('timer').innerText = new Date(sec * 1000).toISOString().substr(11, 8);
-                }} else {{
-                    clearInterval(countdown);
-                    document.getElementById('countdown-area').style.display='none';
-                    document.getElementById('exercise-area').style.display='block';
-                    alarm.play(); start();
-                }}
-            }}, 1000);
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
-            async function start() {{
-                const vid = document.getElementById('v');
-                const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
-                pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
-                pose.onResults(res => {{
-                    const now = Date.now(); const dt = now - last; last = now;
-                    if(!res.poseLandmarks) return;
+    <script>
+        const holdTimerDisplay = document.getElementById('hold-timer');
+        const status = document.getElementById('status');
+        const video = document.getElementById('vid');
+        const alarm = new Audio("{audio_html_src}");
+        alarm.loop = true;
+
+        let timeLeft = {st.session_state.total_seconds};
+        let stretchMs = 0;
+        let lastTs = Date.now();
+
+        const timerInt = setInterval(() => {{
+            if (timeLeft > 0) {{
+                timeLeft--;
+                document.getElementById('big-timer').innerText = new Date(timeLeft * 1000).toISOString().substr(11, 8);
+            }} else {{
+                clearInterval(timerInt);
+                document.getElementById('countdown-area').style.display = 'none';
+                document.getElementById('exercise-area').style.display = 'block';
+                alarm.play().catch(e => {{}});
+                startCamera();
+            }}
+        }}, 1000);
+
+        async function startCamera() {{
+            const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
+            pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
+
+            pose.onResults(res => {{
+                const now = Date.now();
+                const dt = now - lastTs;
+                lastTs = now;
+
+                if (res.poseLandmarks) {{
                     const noseY = res.poseLandmarks[0].y;
-                    const hipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y)/2;
-                    let ok = (mode === "FORWARD") ? (noseY > hipY + 0.05) : (hipY < noseY - 0.1);
-                    if(ok) {{
-                        alarm.pause(); ms += dt;
-                        document.getElementById('ht').innerText = Math.max(0, (30000-ms)/1000).toFixed(1);
-                        document.getElementById('ht').style.color = "#4CAF50";
-                    }} else {{
-                        if(ms < 30000) alarm.play();
-                        document.getElementById('ht').style.color = "#ff4b4b";
-                    }}
-                }});
-                if(cam) await cam.stop();
-                cam = new Camera(vid, {{
-                    onFrame: async () => {{ await pose.send({{image: vid}}); }},
-                    width: 1280, height: 720, facingMode: face
-                }});
-                await cam.start();
-                const tr = vid.srcObject.getVideoTracks()[0];
-                const cap = tr.getCapabilities();
-                if(cap.zoom) tr.applyConstraints({{advanced: [{{zoom: cap.zoom.min}}]}});
-            }}
-            function switchC() {{
-                face = (face === "user") ? "environment" : "user";
-                document.getElementById('v').style.transform = (face === "user") ? "scaleX(-1)" : "scaleX(1)";
-                start();
-            }}
-        </script>
-    </body>
-    </html>
-    """
-    
-    # DER FIX: Wir nutzen ein Iframe mit expliziten Permissions direkt via Markdown
-    import streamlit.components.v1 as components
-    st.components.v1.html(camera_html, height=600, scrolling=False)
-    
-    # Falls der Browser den Iframe blockt, hier ein manueller Button
-    if st.button("DEHNEN BEENDET -> RECAP"):
-        st.session_state.phase = "RECAP"
-        st.rerun()
+                    const hipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y) / 2;
 
-elif st.session_state.phase == "RECAP":
-    st.subheader("📝 Recap")
-    recap = st.text_area("Was hast du gelernt?")
-    if st.button("SPEICHERN"):
-        save_study_session(st.session_state.current_minutes, recap)
+                    if (noseY > hipY + 0.05) {{
+                        alarm.pause();
+                        stretchMs += dt;
+                        let rem = Math.max(0, (30000 - stretchMs) / 1000);
+                        holdTimerDisplay.innerText = rem.toFixed(1);
+                        holdTimerDisplay.style.color = "#4CAF50";
+                        status.innerText = "Sirene pausiert...";
+                        if (stretchMs >= 30000) {{
+                            status.innerText = "FERTIG!";
+                            holdTimerDisplay.innerText = "✓";
+                        }}
+                    }} else {{
+                        if (stretchMs < 30000) alarm.play().catch(()=>{{}});
+                        status.innerText = "TIEFER GEHEN!";
+                        status.style.color = "#ff4b4b";
+                        holdTimerDisplay.style.color = "#ff4b4b";
+                    }}
+                }}
+            }});
+
+            const camera = new Camera(video, {{
+                onFrame: async () => {{ await pose.send({{image: video}}); }},
+                width: 480, height: 360
+            }});
+            camera.start();
+        }}
+    </script>
+    """
+    components.html(js_code, height=650)
+
+    if st.button("RESET"):
         st.session_state.phase = "SETUP"
         st.rerun()
 
