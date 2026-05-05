@@ -28,7 +28,7 @@ def save_study_session(minutes, summary):
     with open(LOG_FILE, "w") as f:
         json.dump(data, f)
 
-# --- 2. CONFIG & STYLE (Hintergrund-Video immer aktiv) ---
+# --- 2. CONFIG & STYLE ---
 st.set_page_config(page_title="ZenStretch", layout="centered")
 
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
@@ -60,7 +60,7 @@ st.markdown(f"""
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
-# Audio
+# Audio laden
 audio_html_src = ""
 if os.path.exists("sirene-da-monique.mp3"):
     with open("sirene-da-monique.mp3", "rb") as f:
@@ -68,9 +68,8 @@ if os.path.exists("sirene-da-monique.mp3"):
 
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
-# --- 3. LOGIK-PHASEN ---
+# --- 3. PHASEN ---
 
-# PHASE 1: SETUP & STATS
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
     
@@ -100,8 +99,8 @@ if st.session_state.phase == "SETUP":
         st.session_state.phase = "ALARM_READY"
         st.rerun()
 
-# PHASE 2: TIMER & STRETCH
 elif st.session_state.phase == "ALARM_READY":
+    # JavaScript Code bleibt gleich, aber wir rufen ihn ohne das 'allow' Argument auf
     js_code = f"""
     <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
         <div id="countdown-area">
@@ -145,11 +144,9 @@ elif st.session_state.phase == "ALARM_READY":
                     alarm.pause(); stretchMs += dt;
                     document.getElementById('hold-timer').innerText = Math.max(0, (30000-stretchMs)/1000).toFixed(1);
                     document.getElementById('hold-timer').style.color = "#4CAF50";
-                    document.getElementById('status').innerText = "Hervorragend!";
                 }} else {{
                     if (stretchMs < 30000) alarm.play();
                     document.getElementById('hold-timer').style.color = "#ff4b4b";
-                    document.getElementById('status').innerText = "POSITION HALTEN!";
                 }}
             }});
             const camera = new Camera(document.getElementById('vid'), {{
@@ -160,16 +157,17 @@ elif st.session_state.phase == "ALARM_READY":
         }}
     </script>
     """
-    components.html(js_code, height=600, allow="camera")
+    # Fix: 'allow' entfernt, da deine Streamlit Version es nicht kennt. 
+    # Browser fragen nun meist automatisch oder man muss es in den Seiteneinstellungen erlauben.
+    components.html(js_code, height=600)
     
     if st.button("DEHNEN FERTIG -> ZUM RECAP"):
         st.session_state.phase = "RECAP"
         st.rerun()
 
-# PHASE 3: RECAP
 elif st.session_state.phase == "RECAP":
     st.subheader("📝 Was hast du gelernt?")
-    recap = st.text_area("Notiere deine wichtigsten Erkenntnisse:", height=150)
+    recap = st.text_area("Notiere deine Erkenntnisse:", height=150)
     if st.button("SPEICHERN & BEENDEN"):
         save_study_session(st.session_state.current_minutes, recap)
         st.session_state.phase = "SETUP"
