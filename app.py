@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import base64
 import os
+import pandas as pd
 from datetime import datetime, timedelta
 
 # --- 1. CONFIG & STYLE ---
@@ -10,6 +11,7 @@ st.set_page_config(page_title="ZenStretch", layout="centered")
 VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
 POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
 
+# Initialisierung
 if 'logbook' not in st.session_state:
     st.session_state.logbook = []
 if 'phase' not in st.session_state:
@@ -41,9 +43,9 @@ st.markdown(f"""
     .stButton>button {{
         width: 100%; border-radius: 50px; background: white; 
         color: black; font-weight: bold; padding: 15px; border: none;
-        font-size: 1.2rem; box-shadow: 0 4px 15px rgba(255,255,255,0.2);
     }}
-    textarea {{ background: rgba(255,255,255,0.1) !important; color: white !important; }}
+    /* Style für die Logbuch-Tabelle */
+    [data-testid="stDataFrame"] {{ background: white; border-radius: 15px; overflow: hidden; }}
     </style>
     <video autoplay muted loop playsinline id="bgVideo"><source src="{VIDEO_URL}" type="video/mp4"></video>
     """, unsafe_allow_html=True)
@@ -66,9 +68,31 @@ if st.query_params.get("finished") == "true":
     st.query_params.clear()
 
 # --- PHASEN ---
-if st.session_state.phase == "SETUP":
-    st.session_state.stretch_complete = False
-    st.title("🧘 ZenStretch")
+
+# PHASE: LOGBUCH ANSEHEN (HISTORIE)
+if st.session_state.phase == "VIEW_HISTORY":
+    st.title("📚 Deine Historie")
+    if st.session_state.logbook:
+        df = pd.DataFrame(st.session_state.logbook)
+        df['Datum'] = df['date'].dt.strftime('%d.%m.%Y %H:%M')
+        st.dataframe(df[['Datum', 'notes']].rename(columns={'notes': 'Lerninhalt'}), use_container_width=True, hide_index=True)
+    else:
+        st.info("Noch keine Einträge vorhanden.")
+    
+    if st.button("ZURÜCK"):
+        st.session_state.phase = "SETUP"
+        st.rerun()
+
+# PHASE: SETUP
+elif st.session_state.phase == "SETUP":
+    col_a, col_b = st.columns([3, 1])
+    with col_a:
+        st.title("🧘 ZenStretch")
+    with col_b:
+        if st.button("📚 LOGS"):
+            st.session_state.phase = "VIEW_HISTORY"
+            st.rerun()
+
     mins, units = get_stats()
     st.markdown(f'<div class="stats-card"><p style="margin:0; opacity:0.7; padding-top:10px;">LETZTE 7 TAGE</p><h3 style="padding-bottom:10px;">{mins} Min. | {units} Einheiten</h3></div>', unsafe_allow_html=True)
     
@@ -80,8 +104,10 @@ if st.session_state.phase == "SETUP":
         st.session_state.total_seconds = (h*3600)+(m*60)+s
         st.session_state.mode = "DOG" if "Hund" in pose else "FORWARD"
         st.session_state.phase = "ALARM_READY"
+        st.session_state.stretch_complete = False
         st.rerun()
 
+# PHASE: TRAINING
 elif st.session_state.phase == "ALARM_READY":
     if not st.session_state.stretch_complete:
         js_code = f"""
@@ -154,13 +180,13 @@ elif st.session_state.phase == "ALARM_READY":
         """
         components.html(js_code, height=500)
     
-    # Der Button erscheint nur, wenn der Timer auf 0 ist (durch JS-Umleitung getriggert)
     if st.session_state.stretch_complete:
         st.success("🎉 Dehnen erfolgreich beendet!")
         if st.button("DEHNEN ABSCHLIESSEN & ZUM LOGBUCH"):
             st.session_state.phase = "LOGBOOK"
             st.rerun()
 
+# PHASE: LOGBOOK EINTRAG
 elif st.session_state.phase == "LOGBOOK":
     st.title("📝 Lern-Logbuch")
     st.write("Was hast du in der gerade beendeten Lernsession gelernt?")
