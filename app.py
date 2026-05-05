@@ -39,7 +39,7 @@ st.markdown(f"""
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
-# Vollbild Button oben rechts
+# Vollbild Button
 components.html("""
 <div style="position: fixed; top: 10px; right: 10px; z-index: 10000;">
     <button onclick="toggleFS()" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; cursor: pointer; backdrop-filter: blur(10px);">⛶</button>
@@ -85,11 +85,10 @@ elif st.session_state.phase == "ALARM_READY":
         <div id="exercise-area" style="display: none;">
             <h2 id="hold-timer" style="font-size: 14vw; font-family: monospace; margin: 5px 0;">30.0</h2>
             
-            <!-- DER ENTSCHEIDENDE BUTTON FÜR DEN BROWSER-DIALOG -->
-            <button id="cam-perm-btn" onclick="requestCam()" style="background: white; color: black; border: none; padding: 15px 25px; border-radius: 50px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">📷 KAMERA FREIGEBEN</button>
+            <button id="cam-perm-btn" onclick="requestCam()" style="background: white; color: black; border: none; padding: 15px 25px; border-radius: 50px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">📷 KAMERA AKTIVIEREN</button>
             
             <div id="video-container" style="display: none; position: relative; width: 90%; max-width: 320px; margin: 0 auto;">
-                <video id="vid" style="width: 100%; transform: scaleX(-1); border-radius: 15px; border: 2px solid white;" autoplay playsinline></video>
+                <video id="vid" style="width: 100%; border-radius: 15px; border: 2px solid white; transition: transform 0.3s ease;" autoplay playsinline></video>
                 <button onclick="switchCamera()" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 1px solid white; border-radius: 20px; padding: 8px 12px; cursor: pointer; font-size: 12px; z-index: 100;">🔄</button>
             </div>
             
@@ -120,20 +119,23 @@ elif st.session_state.phase == "ALARM_READY":
         }}, 1000);
 
         async function requestCam() {{
-            // Dieser Aufruf triggert den Browser-Dialog
             try {{
                 const stream = await navigator.mediaDevices.getUserMedia({{ video: true }});
-                stream.getTracks().forEach(track => track.stop()); // Kurz testen und wieder stoppen
+                stream.getTracks().forEach(track => track.stop());
                 document.getElementById('cam-perm-btn').style.display = 'none';
                 document.getElementById('video-container').style.display = 'block';
                 startCamera();
             }} catch (err) {{
-                alert("Kamera-Zugriff wurde verweigert oder ist nicht möglich. Bitte HTTPS prüfen!");
+                alert("Kamera-Zugriff verweigert.");
             }}
         }}
 
         async function startCamera() {{
             const video = document.getElementById('vid');
+            
+            // Spiegelung: Frontkamera JA, Rückkamera NEIN
+            video.style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
+
             const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
             pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
             
@@ -153,26 +155,32 @@ elif st.session_state.phase == "ALARM_READY":
                 }} else {{
                     if (stretchMs < 30000) alarm.play();
                     document.getElementById('hold-timer').style.color = "#ff4b4b";
-                    document.getElementById('status').innerText = "TIEFER!";
+                    document.getElementById('status').innerText = mode === "FORWARD" ? "TIEFER!" : "HÜFTE HOCH!";
                 }}
             }});
 
+            if (cameraObj) await cameraObj.stop();
             cameraObj = new Camera(video, {{
                 onFrame: async () => {{ await pose.send({{image: video}}); }},
                 width: 640, height: 480, facingMode: currentFacingMode
             }});
-            cameraObj.start().then(() => {{
-                // Optional: Zoom-Versuch nach Start
-                setTimeout(() => {{
+            
+            await cameraObj.start();
+
+            // ZOOM-Logik für Rückkamera (0.5 Weitwinkel erzwingen)
+            setTimeout(() => {{
+                try {{
                     const track = video.srcObject.getVideoTracks()[0];
-                    if (track.getCapabilities().zoom) track.applyConstraints({{advanced: [{{zoom: 0}}]}});
-                }}, 500);
-            }});
+                    const caps = track.getCapabilities();
+                    if (caps.zoom) {{
+                        track.applyConstraints({{ advanced: [{{ zoom: caps.zoom.min }}] }});
+                    }}
+                }} catch(e) {{ console.log("Zoom nicht unterstützt"); }}
+            }}, 1000);
         }}
 
         function switchCamera() {{
             currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-            document.getElementById('vid').style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
             startCamera();
         }}
     </script>
