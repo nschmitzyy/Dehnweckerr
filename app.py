@@ -1,114 +1,4 @@
-import streamlit as st
-import streamlit.components.v1 as components
-import base64
-import os
-import json
-from datetime import datetime
-import pandas as pd
-
-# --- 1. DATENVERWALTUNG (Recaps & Zeit) ---
-LOG_FILE = "study_log.json"
-
-def load_data():
-    if os.path.exists(LOG_FILE):
-        try:
-            with open(LOG_FILE, "r") as f:
-                return json.load(f)
-        except: return []
-    return []
-
-def save_study_session(minutes, summary):
-    data = load_data()
-    today = datetime.now().strftime("%Y-%m-%d %H:%M")
-    data.append({
-        "date": today, 
-        "minutes": round(minutes, 1),
-        "summary": summary
-    })
-    with open(LOG_FILE, "w") as f:
-        json.dump(data, f)
-
-# --- 2. CONFIG & BACKGROUND VIDEO ---
-st.set_page_config(page_title="ZenStretch", layout="centered")
-
-VIDEO_URL = "https://raw.githubusercontent.com/nschmitzyy/dehnweckerr/main/247740_medium.mp4"
-POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=1000"
-
-# Das hier MUSS ganz oben stehen, damit das Video immer da ist
-st.markdown(f"""
-    <style>
-    #bgVideo {{
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        z-index: -1; object-fit: cover; filter: brightness(35%);
-        background: url({POSTER_URL}) center/cover no-repeat;
-    }}
-    [data-testid="stHeader"], header, .st-emotion-cache-18ni7ap {{
-        display: none !important; visibility: hidden !important;
-    }}
-    .block-container {{ padding-top: 0rem !important; margin-top: -50px !important; }}
-    .stApp {{ background: transparent !important; }}
-    .main-card {{
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-        border-radius: 30px; padding: 40px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white; text-align: center; margin-top: 5vh;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-    }}
-    .stButton>button {{
-        width: 100%; border-radius: 50px; background: rgba(255, 255, 255, 0.9); 
-        color: #000; font-weight: bold; padding: 15px; border: none;
-    }}
-    div[data-testid="stWidgetLabel"] p {{ color: white !important; }}
-    </style>
-    <video autoplay muted loop playsinline id="bgVideo"><source src="{VIDEO_URL}" type="video/mp4"></video>
-    """, unsafe_allow_html=True)
-
-if 'phase' not in st.session_state:
-    st.session_state.phase = "SETUP"
-
-# Audio laden
-audio_html_src = ""
-if os.path.exists("sirene-da-monique.mp3"):
-    with open("sirene-da-monique.mp3", "rb") as f:
-        audio_html_src = f"data:audio/mp3;base64,{base64.b64encode(f.read()).decode()}"
-
-st.markdown('<div class="main-card">', unsafe_allow_html=True)
-
-# --- 3. PHASEN-LOGIK ---
-
-if st.session_state.phase == "SETUP":
-    st.title("🧘 ZenStretch")
-    
-    # Statistik Sektion
-    raw_data = load_data()
-    if raw_data:
-        df = pd.DataFrame(raw_data)
-        st.subheader("Deine Fortschritte")
-        df['date_only'] = pd.to_datetime(df['date']).dt.date
-        stats = df.groupby('date_only')['minutes'].sum()
-        st.bar_chart(stats, height=150)
-        with st.expander("Letzte Notizen"):
-            for entry in reversed(raw_data[-3:]):
-                st.write(f"**{entry['date']}**: {entry['summary']}")
-
-    st.markdown("---")
-    stretch_choice = st.radio("Fokus nach dem Lernen:", ["Vorbeuge (Rücken)", "Herabschauender Hund (Blutfluss)"])
-    
-    col1, col2, col3 = st.columns(3)
-    hrs = col1.number_input("Std", 0, 23, 0)
-    mins = col2.number_input("Min", 0, 59, 20)
-    secs = col3.number_input("Sek", 0, 59, 0)
-    
-    if st.button("TIMER STARTEN"):
-        st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
-        st.session_state.mode = "DOG" if "Hund" in stretch_choice else "FORWARD"
-        st.session_state.current_minutes = (hrs * 60) + mins + (secs / 60)
-        st.session_state.phase = "ALARM_READY"
-        st.rerun()
-
 elif st.session_state.phase == "ALARM_READY":
-    # JavaScript für Timer & KI-Kamera
     js_code = f"""
     <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
         <div id="countdown-area">
@@ -170,13 +60,20 @@ elif st.session_state.phase == "ALARM_READY":
                     document.getElementById('status').innerText = mode === "FORWARD" ? "TIEFER BEUGEN!" : "HÜFTE HÖHER!";
                 }}
             }});
-            if (cameraObj) await cameraObj.stop();
-            cameraObj = new Camera(document.getElementById('vid'), {{
-                onFrame: async () => {{ await pose.send({{image: document.getElementById('vid')}}); }},
-                width: 1280, height: 720, facingMode: currentFacingMode
-            }});
-            cameraObj.start();
+            
+            try {{
+                if (cameraObj) await cameraObj.stop();
+                cameraObj = new Camera(document.getElementById('vid'), {{
+                    onFrame: async () => {{ await pose.send({{image: document.getElementById('vid')}}); }},
+                    width: 1280, height: 720, facingMode: currentFacingMode
+                }});
+                await cameraObj.start();
+            }} catch (err) {{
+                console.error("Kamerafehler:", err);
+                document.getElementById('status').innerText = "Kamera-Zugriff verweigert!";
+            }}
         }}
+
         function switchCamera() {{
             currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
             document.getElementById('vid').style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
@@ -184,20 +81,9 @@ elif st.session_state.phase == "ALARM_READY":
         }}
     </script>
     """
-    components.html(js_code, height=600)
+    # HIER IST DIE WICHTIGE ÄNDERUNG: allow="camera"
+    components.html(js_code, height=600, allow="camera")
     
     if st.button("DEHNEN FERTIG -> RECAP"):
         st.session_state.phase = "RECAP"
         st.rerun()
-
-elif st.session_state.phase == "RECAP":
-    st.subheader("📝 Zusammenfassung")
-    st.write("Was hast du gerade gelernt? (Kurz & knapp)")
-    recap_text = st.text_area("", placeholder="Ich habe gelernt, dass...")
-    
-    if st.button("SPEICHERN & ENTSPANNEN"):
-        save_study_session(st.session_state.current_minutes, recap_text)
-        st.session_state.phase = "SETUP"
-        st.rerun()
-
-st.markdown('</div>', unsafe_allow_html=True)
