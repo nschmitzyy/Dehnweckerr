@@ -79,21 +79,21 @@ if st.session_state.phase == "SETUP":
 
 elif st.session_state.phase == "ALARM_READY":
     js_code = f"""
-    <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
+    <div id="root" style="text-align: center; color: white; font-family: sans-serif; width: 100%;">
         <div id="countdown-area">
-            <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace;">00:00:00</p>
-            <p style="opacity: 0.7;">TABS AUSGEBLENDET? FOKUS...</p>
+            <p id="big-timer" style="font-size: 18vw; max-font-size: 120px; font-weight: 100; font-family: monospace; margin: 20px 0; line-height: 1;">00:00:00</p>
+            <p style="opacity: 0.7; font-size: 4vw; max-font-size: 20px;">TABS AUSGEBLENDET? FOKUS...</p>
         </div>
         <div id="exercise-area" style="display: none;">
-            <h2 style="color: #ff4b4b;">🚨 ZEIT ZUM DEHNEN! 🚨</h2>
-            <h2 id="hold-timer" style="font-size: 64px; font-family: monospace;">30.0</h2>
+            <h2 style="color: #ff4b4b; font-size: 6vw; max-font-size: 28px;">🚨 ZEIT ZUM DEHNEN! 🚨</h2>
+            <h2 id="hold-timer" style="font-size: 15vw; max-font-size: 80px; font-family: monospace; margin: 10px 0;">30.0</h2>
             
-            <div style="position: relative; display: inline-block;">
-                <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
-                <button onclick="switchCamera()" style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">🔄 Kamera</button>
+            <div style="position: relative; display: inline-block; width: 95%; max-width: 400px;">
+                <video id="vid" style="width: 100%; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
+                <button onclick="switchCamera()" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 30px; padding: 10px 15px; cursor: pointer; font-weight: bold; z-index: 100;">🔄 Kamera</button>
             </div>
             
-            <p id="status" style="margin-top: 10px; font-size: 20px; font-weight: bold;"></p>
+            <p id="status" style="margin-top: 15px; font-size: 5vw; max-font-size: 22px; font-weight: bold;"></p>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -107,13 +107,14 @@ elif st.session_state.phase == "ALARM_READY":
         
         let timeLeft = {st.session_state.total_seconds};
         let stretchMs = 0; let lastTs = Date.now();
-        let currentFacingMode = "user"; // Startet mit Frontkamera
+        let currentFacingMode = "user";
         let cameraObj = null;
 
         const timerInt = setInterval(() => {{
             if (timeLeft > 0) {{
                 timeLeft--;
-                document.getElementById('big-timer').innerText = new Date(timeLeft * 1000).toISOString().substr(11, 8);
+                let d = new Date(timeLeft * 1000).toISOString().substr(11, 8);
+                document.getElementById('big-timer').innerText = d;
             }} else {{
                 clearInterval(timerInt);
                 document.getElementById('countdown-area').style.display = 'none';
@@ -165,7 +166,6 @@ elif st.session_state.phase == "ALARM_READY":
 
         function switchCamera() {{
             currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-            // Spiegeleffekt bei Rückkamera ausschalten
             video.style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
             startCamera();
         }}
