@@ -12,7 +12,7 @@ POSTER_URL = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=
 
 # Daten-Initialisierung im Session State
 if 'logbook' not in st.session_state:
-    st.session_state.logbook = [] # Liste von Dicts: {"date": dt, "duration": sec, "notes": str}
+    st.session_state.logbook = []
 
 st.markdown(f"""
     <style>
@@ -86,11 +86,10 @@ st.markdown('<div class="main-card">', unsafe_allow_html=True)
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
     
-    # Dashboard
     mins_total, units_total = get_stats()
     st.markdown(f"""
     <div class="stats-card">
-        <p style="margin:0; opacity:0.7;">Letzte 7 Tage</p>
+        <p style="margin:0; opacity:0.7; font-size: 0.9rem;">LETZTE 7 TAGE</p>
         <h3 style="margin:5px 0;">{mins_total} Min. | {units_total} Einheiten</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -118,11 +117,14 @@ elif st.session_state.phase == "ALARM_READY":
         
         <div id="exercise-area" style="display: none;">
             <h2 id="hold-timer" style="font-size: 14vw; font-family: monospace; margin: 5px 0;">30.0</h2>
+            
             <button id="cam-perm-btn" onclick="requestCam()" style="background: white; color: black; border: none; padding: 15px 25px; border-radius: 50px; font-weight: bold; cursor: pointer; margin-bottom: 15px; width: 80%;">📷 KAMERA FREIGEBEN</button>
+            
             <div id="video-container" style="display: none; position: relative; width: 90%; max-width: 320px; margin: 0 auto;">
                 <video id="vid" style="width: 100%; border-radius: 15px; border: 2px solid white; transition: transform 0.3s ease;" autoplay playsinline></video>
                 <button onclick="switchCamera()" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 1px solid white; border-radius: 20px; padding: 8px 12px; cursor: pointer; font-size: 12px; z-index: 100;">🔄</button>
             </div>
+            
             <p id="status" style="margin-top: 10px; font-size: 4.5vw; font-weight: bold;"></p>
         </div>
     </div>
@@ -136,7 +138,6 @@ elif st.session_state.phase == "ALARM_READY":
         let stretchMs = 0; let lastTs = Date.now();
         let currentFacingMode = "user";
         let cameraObj = null;
-        let finished = false;
 
         const timerInt = setInterval(() => {{
             if (timeLeft > 0) {{
@@ -163,11 +164,11 @@ elif st.session_state.phase == "ALARM_READY":
         async function startCamera() {{
             const video = document.getElementById('vid');
             video.style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
+
             const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
             pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
             
             pose.onResults(res => {{
-                if (finished) return;
                 const now = Date.now(); const dt = now - lastTs; lastTs = now;
                 if (!res.poseLandmarks) return;
                 const noseY = res.poseLandmarks[0].y;
@@ -180,63 +181,60 @@ elif st.session_state.phase == "ALARM_READY":
                     document.getElementById('hold-timer').innerText = rem.toFixed(1);
                     document.getElementById('hold-timer').style.color = "#4CAF50";
                     document.getElementById('status').innerText = "HALTEN!";
-                    if (stretchMs >= 30000 && !finished) {{
-                        finished = true;
-                        window.parent.postMessage({{"type": "STRETCH_DONE"}}, "*");
-                    }}
                 }} else {{
                     if (stretchMs < 30000) alarm.play();
                     document.getElementById('hold-timer').style.color = "#ff4b4b";
-                    document.getElementById('status').innerText = "TIEFER!";
+                    document.getElementById('status').innerText = mode === "FORWARD" ? "TIEFER!" : "HÜFTE HOCH!";
                 }}
             }});
 
+            if (cameraObj) await cameraObj.stop();
             cameraObj = new Camera(video, {{
                 onFrame: async () => {{ await pose.send({{image: video}}); }},
                 width: 640, height: 480, facingMode: currentFacingMode
             }});
-            cameraObj.start();
+            
+            cameraObj.start().then(() => {{
+                setTimeout(async () => {{
+                    try {{
+                        const track = video.srcObject.getVideoTracks()[0];
+                        const caps = track.getCapabilities();
+                        if (caps && caps.zoom && caps.zoom.min <= 0.6) {{
+                            const targetZoom = Math.max(caps.zoom.min, 0.5);
+                            await track.applyConstraints({{ advanced: [{{ zoom: targetZoom }}] }});
+                        }}
+                    }} catch(e) {{ console.log("Zoom-Info nicht verfügbar"); }}
+                }}, 1200);
+            }});
         }}
+
         function switchCamera() {{
             currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
             startCamera();
         }}
     </script>
     """
-    components.html(js_code, height=550)
+    components.html(js_code, height=600) # Höhe erhöht für Stabilität
     
-    # Message Listener für Streamlit (Um Phase zu wechseln wenn fertig)
-    st.components.v1.html("""
-        <script>
-        window.addEventListener("message", (event) => {
-            if (event.data.type === "STRETCH_DONE") {
-                window.parent.location.hash = "done";
-            }
-        });
-        </script>
-    """, height=0)
-    
-    # Trick um von JS zurück zu Streamlit zu kommen
-    if st.button("MANUELL FERTIG (Logbuch)"):
+    # Notfall-Button falls JS-Event nicht triggert
+    if st.button("ZUM LOGBUCH (NACH DEM DEHNEN)"):
         st.session_state.phase = "LOGBOOK"
         st.rerun()
 
-# --- PHASE: LOGBOOK (Active Remembering) ---
+# --- PHASE: LOGBOOK ---
 elif st.session_state.phase == "LOGBOOK":
     st.title("📝 Logbuch")
     st.subheader("Active Remembering")
-    st.write("Was hast du während dieser Dehneinheit über deinen Körper oder deinen Fokus gelernt?")
+    st.write("Was hast du heute über deinen Körper gelernt?")
     
-    note = st.text_area("Deine Erkenntnis...", placeholder="z.B. Linke Hüfte ist heute fester als rechts...")
+    note = st.text_area("Erkenntnis...", placeholder="z.B. Schultern waren heute locker...")
     
-    if st.button("SPEICHERN & BEENDEN"):
-        # Daten sichern
-        new_entry = {
+    if st.button("SPEICHERN"):
+        st.session_state.logbook.append({
             "date": datetime.now(),
-            "duration": 30, # Die 30 Sekunden Dehnzeit
+            "duration": 30,
             "notes": note
-        }
-        st.session_state.logbook.append(new_entry)
+        })
         st.session_state.phase = "SETUP"
         st.rerun()
 
