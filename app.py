@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import base64
 import os
 import json
@@ -20,11 +19,7 @@ def load_data():
 def save_study_session(minutes, summary):
     data = load_data()
     today = datetime.now().strftime("%Y-%m-%d %H:%M")
-    data.append({
-        "date": today, 
-        "minutes": round(minutes, 1),
-        "summary": summary
-    })
+    data.append({"date": today, "minutes": round(minutes, 1), "summary": summary})
     with open(LOG_FILE, "w") as f:
         json.dump(data, f)
 
@@ -45,10 +40,10 @@ st.markdown(f"""
     .stApp {{ background: transparent !important; }}
     
     .fullscreen-btn {{
-        position: fixed; top: 20px; right: 20px; z-index: 9999;
-        background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2); color: white;
-        padding: 10px 15px; border-radius: 12px; cursor: pointer;
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);
+        border: 2px solid white; color: white; padding: 12px 20px;
+        border-radius: 15px; cursor: pointer; font-weight: bold;
     }}
 
     .main-card {{
@@ -56,19 +51,23 @@ st.markdown(f"""
         border-radius: 30px; padding: 40px; border: 1px solid rgba(255, 255, 255, 0.1);
         color: white; text-align: center; margin-top: 5vh;
     }}
-    .stButton>button {{
-        width: 100%; border-radius: 50px; background: white; color: black; font-weight: bold;
-    }}
-    div[data-testid="stWidgetLabel"] p {{ color: white !important; }}
+    .stButton>button {{ width: 100%; border-radius: 50px; background: white; color: black; font-weight: bold; }}
     </style>
     
     <video autoplay muted loop playsinline id="bgVideo"><source src="{VIDEO_URL}" type="video/mp4"></video>
-    <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶ Vollbild</button>
+    
+    <button class="fullscreen-btn" onclick="openFullscreen()">⛶ VOLLBILD AKTIVIEREN</button>
 
     <script>
-    function toggleFullScreen() {{
-        if (!document.fullscreenElement) {{ document.documentElement.requestFullscreen(); }}
-        else {{ if (document.exitFullscreen) {{ document.exitFullscreen(); }} }}
+    function openFullscreen() {{
+        var elem = document.documentElement;
+        if (elem.requestFullscreen) {{
+            elem.requestFullscreen();
+        }} else if (elem.webkitRequestFullscreen) {{ /* Safari */
+            elem.webkitRequestFullscreen();
+        }} else if (elem.msRequestFullscreen) {{ /* IE11 */
+            elem.msRequestFullscreen();
+        }}
     }}
     </script>
     """, unsafe_allow_html=True)
@@ -90,15 +89,12 @@ if st.session_state.phase == "SETUP":
     raw_data = load_data()
     if raw_data:
         df = pd.DataFrame(raw_data)
-        st.subheader("Fortschritte")
-        df['date_only'] = pd.to_datetime(df['date']).dt.date
-        stats = df.groupby('date_only')['minutes'].sum()
-        st.bar_chart(stats, height=150)
+        st.bar_chart(df.groupby(pd.to_datetime(df['date']).dt.date)['minutes'].sum(), height=150)
 
     st.markdown("---")
-    stretch_choice = st.radio("Pose:", ["Vorbeuge", "Hund"])
-    col1, col2, col3 = st.columns(3)
-    hrs, mins, secs = col1.number_input("Std", 0,23,0), col2.number_input("Min", 0,59,20), col3.number_input("Sek", 0,59,0)
+    stretch_choice = st.radio("Fokus:", ["Vorbeuge", "Hund"])
+    c1, c2, c3 = st.columns(3)
+    hrs, mins, secs = c1.number_input("H",0,23,0), c2.number_input("M",0,59,20), c3.number_input("S",0,59,0)
     
     if st.button("LERNEN STARTEN"):
         st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
@@ -108,97 +104,96 @@ if st.session_state.phase == "SETUP":
         st.rerun()
 
 elif st.session_state.phase == "ALARM_READY":
-    js_code = f"""
-    <div id="root" style="text-align: center; color: white; font-family: sans-serif;">
+    # WICHTIG: Wir bauen den HTML-Code für die Kamera hier zusammen
+    camera_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    </head>
+    <body style="margin:0; background:transparent; color:white; font-family:sans-serif; text-align:center;">
         <div id="countdown-area">
-            <p id="big-timer" style="font-size: 80px; font-weight: 100; font-family: monospace;">00:00:00</p>
+            <h1 id="timer" style="font-size:80px; margin:20px 0;">00:00:00</h1>
         </div>
-        <div id="exercise-area" style="display: none;">
-            <h2 id="hold-timer" style="font-size: 64px; font-family: monospace; color: #ff4b4b;">30.0</h2>
-            <div style="position: relative; display: inline-block;">
-                <video id="vid" style="width: 100%; max-width: 400px; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
-                <button onclick="switchCam()" style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 20px;">🔄</button>
+        <div id="exercise-area" style="display:none;">
+            <h2 id="ht" style="font-size:60px; color:#ff4b4b;">30.0</h2>
+            <div style="position:relative; display:inline-block;">
+                <video id="v" style="width:90%; max-width:400px; border-radius:20px; border:3px solid white; transform:scaleX(-1);" autoplay playsinline></video>
+                <button onclick="switchC()" style="position:absolute; bottom:20px; right:30px; width:50px; height:50px; border-radius:50%; background:rgba(0,0,0,0.6); color:white; border:none; font-size:24px;">🔄</button>
             </div>
-            <p id="status" style="font-size: 18px; margin-top: 10px;"></p>
         </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script>
-        const alarm = new Audio("{audio_html_src}"); alarm.loop = true;
-        let timeLeft = {st.session_state.total_seconds};
-        let stretchMs = 0; let lastTs = Date.now();
-        let currentFacingMode = "user";
-        let cameraObj = null;
+        <script>
+            const alarm = new Audio("{audio_html_src}"); alarm.loop = true;
+            let sec = {st.session_state.total_seconds};
+            let ms = 0; let last = Date.now();
+            let mode = "{st.session_state.mode}";
+            let face = "user"; let cam = null;
 
-        const timerInt = setInterval(() => {{
-            if (timeLeft > 0) {{
-                timeLeft--;
-                document.getElementById('big-timer').innerText = new Date(timeLeft * 1000).toISOString().substr(11, 8);
-            }} else {{
-                clearInterval(timerInt);
-                document.getElementById('countdown-area').style.display = 'none';
-                document.getElementById('exercise-area').style.display = 'block';
-                alarm.play(); startCamera();
-            }}
-        }}, 1000);
-
-        async function startCamera() {{
-            const video = document.getElementById('vid');
-            const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
-            pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
-            pose.onResults(res => {{
-                const now = Date.now(); const dt = now - lastTs; lastTs = now;
-                if (!res.poseLandmarks) return;
-                const noseY = res.poseLandmarks[0].y;
-                const hipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y) / 2;
-                let ok = ("{st.session_state.mode}" === "FORWARD") ? (noseY > hipY + 0.05) : (hipY < noseY - 0.1);
-                if (ok) {{
-                    alarm.pause(); stretchMs += dt;
-                    document.getElementById('hold-timer').innerText = Math.max(0, (30000-stretchMs)/1000).toFixed(1);
-                    document.getElementById('hold-timer').style.color = "#4CAF50";
+            const countdown = setInterval(() => {{
+                if(sec > 0) {{
+                    sec--;
+                    document.getElementById('timer').innerText = new Date(sec * 1000).toISOString().substr(11, 8);
                 }} else {{
-                    if (stretchMs < 30000) alarm.play();
-                    document.getElementById('hold-timer').style.color = "#ff4b4b";
+                    clearInterval(countdown);
+                    document.getElementById('countdown-area').style.display='none';
+                    document.getElementById('exercise-area').style.display='block';
+                    alarm.play(); start();
                 }}
-            }});
+            }}, 1000);
 
-            if (cameraObj) await cameraObj.stop();
-            
-            cameraObj = new Camera(video, {{
-                onFrame: async () => {{ await pose.send({{image: video}}); }},
-                width: 1280, height: 720, facingMode: currentFacingMode
-            }});
-
-            await cameraObj.start();
-
-            // Zoom-Logik (0.5 / Weitwinkel versuchen)
-            const stream = video.srcObject;
-            const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            if (capabilities.zoom) {{
-                try {{
-                    await track.applyConstraints({{ advanced: [{{ zoom: capabilities.zoom.min }}] }});
-                }} catch (e) {{ console.log("Zoom nicht anwendbar"); }}
+            async function start() {{
+                const vid = document.getElementById('v');
+                const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
+                pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
+                pose.onResults(res => {{
+                    const now = Date.now(); const dt = now - last; last = now;
+                    if(!res.poseLandmarks) return;
+                    const noseY = res.poseLandmarks[0].y;
+                    const hipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y)/2;
+                    let ok = (mode === "FORWARD") ? (noseY > hipY + 0.05) : (hipY < noseY - 0.1);
+                    if(ok) {{
+                        alarm.pause(); ms += dt;
+                        document.getElementById('ht').innerText = Math.max(0, (30000-ms)/1000).toFixed(1);
+                        document.getElementById('ht').style.color = "#4CAF50";
+                    }} else {{
+                        if(ms < 30000) alarm.play();
+                        document.getElementById('ht').style.color = "#ff4b4b";
+                    }}
+                }});
+                if(cam) await cam.stop();
+                cam = new Camera(vid, {{
+                    onFrame: async () => {{ await pose.send({{image: vid}}); }},
+                    width: 1280, height: 720, facingMode: face
+                }});
+                await cam.start();
+                const tr = vid.srcObject.getVideoTracks()[0];
+                const cap = tr.getCapabilities();
+                if(cap.zoom) tr.applyConstraints({{advanced: [{{zoom: cap.zoom.min}}]}});
             }}
-        }}
-
-        function switchCam() {{
-            currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-            document.getElementById('vid').style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
-            startCamera();
-        }}
-    </script>
+            function switchC() {{
+                face = (face === "user") ? "environment" : "user";
+                document.getElementById('v').style.transform = (face === "user") ? "scaleX(-1)" : "scaleX(1)";
+                start();
+            }}
+        </script>
+    </body>
+    </html>
     """
-    components.html(js_code, height=600)
+    
+    # DER FIX: Wir nutzen ein Iframe mit expliziten Permissions direkt via Markdown
+    import streamlit.components.v1 as components
+    st.components.v1.html(camera_html, height=600, scrolling=False)
+    
+    # Falls der Browser den Iframe blockt, hier ein manueller Button
     if st.button("DEHNEN BEENDET -> RECAP"):
         st.session_state.phase = "RECAP"
         st.rerun()
 
 elif st.session_state.phase == "RECAP":
     st.subheader("📝 Recap")
-    recap = st.text_area("Erkenntnisse:", height=150)
-    if st.button("FERTIG"):
+    recap = st.text_area("Was hast du gelernt?")
+    if st.button("SPEICHERN"):
         save_study_session(st.session_state.current_minutes, recap)
         st.session_state.phase = "SETUP"
         st.rerun()
