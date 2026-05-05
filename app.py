@@ -19,21 +19,19 @@ st.markdown(f"""
     [data-testid="stHeader"], header, .st-emotion-cache-18ni7ap {{
         display: none !important; visibility: hidden !important;
     }}
-    .block-container {{ padding-top: 0rem !important; margin-top: -50px !important; }}
+    .block-container {{ padding-top: 0rem !important; margin-top: -20px !important; }}
     .stApp {{ background: transparent !important; }}
     .main-card {{
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-        border-radius: 30px; padding: 40px;
+        border-radius: 25px; padding: 20px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white; text-align: center; margin-top: 5vh;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        color: white; text-align: center; margin-top: 2vh;
     }}
     .stButton>button {{
         width: 100%; border-radius: 50px; background: rgba(255, 255, 255, 0.9); 
-        color: #000; font-weight: bold; padding: 15px; border: none;
+        color: #000; font-weight: bold; padding: 12px; border: none;
     }}
-    div[data-testid="stWidgetLabel"] p {{ color: white !important; font-size: 1.1rem; }}
     </style>
     <video autoplay muted loop playsinline id="bgVideo"><source src="{VIDEO_URL}" type="video/mp4"></video>
     """, unsafe_allow_html=True)
@@ -41,7 +39,7 @@ st.markdown(f"""
 if 'phase' not in st.session_state:
     st.session_state.phase = "SETUP"
 
-# Vollbild Button
+# Vollbild Button oben rechts
 components.html("""
 <div style="position: fixed; top: 10px; right: 10px; z-index: 10000;">
     <button onclick="toggleFS()" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; cursor: pointer; backdrop-filter: blur(10px);">⛶</button>
@@ -53,7 +51,7 @@ function toggleFS() {
     else doc.exitFullscreen();
 }
 </script>
-""", height=60)
+""", height=50)
 
 # Audio
 audio_html_src = ""
@@ -65,12 +63,11 @@ st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
 if st.session_state.phase == "SETUP":
     st.title("🧘 ZenStretch")
-    stretch_choice = st.radio("Wähle deine Pose:", ["Vorbeuge (Rücken & Beine)", "Herabschauender Hund (Bloodflow)"])
-    st.write("Timer einstellen:")
-    col1, col2, col3 = st.columns(3)
-    hrs = col1.number_input("Std", 0, 23, 0)
-    mins = col2.number_input("Min", 0, 59, 20)
-    secs = col3.number_input("Sek", 0, 59, 0)
+    stretch_choice = st.radio("Pose:", ["Vorbeuge (Rücken & Beine)", "Herabschauender Hund (Bloodflow)"], horizontal=True)
+    c1, c2, c3 = st.columns(3)
+    hrs = c1.number_input("Std", 0, 23, 0)
+    mins = c2.number_input("Min", 0, 59, 20)
+    secs = c3.number_input("Sek", 0, 59, 0)
     if st.button("SCHARF SCHALTEN"):
         st.session_state.total_seconds = (hrs * 3600) + (mins * 60) + secs
         st.session_state.mode = "DOG" if "Hund" in stretch_choice else "FORWARD"
@@ -81,30 +78,30 @@ elif st.session_state.phase == "ALARM_READY":
     js_code = f"""
     <div id="root" style="text-align: center; color: white; font-family: sans-serif; width: 100%;">
         <div id="countdown-area">
-            <p id="big-timer" style="font-size: 18vw; max-font-size: 120px; font-weight: 100; font-family: monospace; margin: 20px 0; line-height: 1;">00:00:00</p>
-            <p style="opacity: 0.7; font-size: 4vw; max-font-size: 20px;">TABS AUSGEBLENDET? FOKUS...</p>
+            <p id="big-timer" style="font-size: 18vw; font-weight: 100; font-family: monospace; margin: 10px 0; line-height: 1;">00:00:00</p>
+            <p style="opacity: 0.7; font-size: 3.5vw;">FOKUS AKTIV</p>
         </div>
+        
         <div id="exercise-area" style="display: none;">
-            <h2 style="color: #ff4b4b; font-size: 6vw; max-font-size: 28px;">🚨 ZEIT ZUM DEHNEN! 🚨</h2>
-            <h2 id="hold-timer" style="font-size: 15vw; max-font-size: 80px; font-family: monospace; margin: 10px 0;">30.0</h2>
+            <h2 id="hold-timer" style="font-size: 14vw; font-family: monospace; margin: 5px 0;">30.0</h2>
             
-            <div style="position: relative; display: inline-block; width: 95%; max-width: 400px;">
-                <video id="vid" style="width: 100%; transform: scaleX(-1); border-radius: 20px; border: 2px solid white;" autoplay playsinline></video>
-                <button onclick="switchCamera()" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 30px; padding: 10px 15px; cursor: pointer; font-weight: bold; z-index: 100;">🔄 Kamera</button>
+            <!-- DER ENTSCHEIDENDE BUTTON FÜR DEN BROWSER-DIALOG -->
+            <button id="cam-perm-btn" onclick="requestCam()" style="background: white; color: black; border: none; padding: 15px 25px; border-radius: 50px; font-weight: bold; cursor: pointer; margin-bottom: 15px;">📷 KAMERA FREIGEBEN</button>
+            
+            <div id="video-container" style="display: none; position: relative; width: 90%; max-width: 320px; margin: 0 auto;">
+                <video id="vid" style="width: 100%; transform: scaleX(-1); border-radius: 15px; border: 2px solid white;" autoplay playsinline></video>
+                <button onclick="switchCamera()" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: 1px solid white; border-radius: 20px; padding: 8px 12px; cursor: pointer; font-size: 12px; z-index: 100;">🔄</button>
             </div>
             
-            <p id="status" style="margin-top: 15px; font-size: 5vw; max-font-size: 22px; font-weight: bold;"></p>
+            <p id="status" style="margin-top: 10px; font-size: 4.5vw; font-weight: bold;"></p>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script>
         const mode = "{st.session_state.mode}";
-        const holdTimerDisplay = document.getElementById('hold-timer');
-        const status = document.getElementById('status');
-        const video = document.getElementById('vid');
         const alarm = new Audio("{audio_html_src}"); alarm.loop = true;
-        
         let timeLeft = {st.session_state.total_seconds};
         let stretchMs = 0; let lastTs = Date.now();
         let currentFacingMode = "user";
@@ -113,65 +110,74 @@ elif st.session_state.phase == "ALARM_READY":
         const timerInt = setInterval(() => {{
             if (timeLeft > 0) {{
                 timeLeft--;
-                let d = new Date(timeLeft * 1000).toISOString().substr(11, 8);
-                document.getElementById('big-timer').innerText = d;
+                document.getElementById('big-timer').innerText = new Date(timeLeft * 1000).toISOString().substr(11, 8);
             }} else {{
                 clearInterval(timerInt);
                 document.getElementById('countdown-area').style.display = 'none';
                 document.getElementById('exercise-area').style.display = 'block';
-                alarm.play(); startCamera();
+                alarm.play();
             }}
         }}, 1000);
 
+        async function requestCam() {{
+            // Dieser Aufruf triggert den Browser-Dialog
+            try {{
+                const stream = await navigator.mediaDevices.getUserMedia({{ video: true }});
+                stream.getTracks().forEach(track => track.stop()); // Kurz testen und wieder stoppen
+                document.getElementById('cam-perm-btn').style.display = 'none';
+                document.getElementById('video-container').style.display = 'block';
+                startCamera();
+            }} catch (err) {{
+                alert("Kamera-Zugriff wurde verweigert oder ist nicht möglich. Bitte HTTPS prüfen!");
+            }}
+        }}
+
         async function startCamera() {{
+            const video = document.getElementById('vid');
             const pose = new Pose({{locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${{f}}` }});
             pose.setOptions({{ modelComplexity: 0, minDetectionConfidence: 0.5 }});
+            
             pose.onResults(res => {{
                 const now = Date.now(); const dt = now - lastTs; lastTs = now;
                 if (!res.poseLandmarks) return;
-
                 const noseY = res.poseLandmarks[0].y;
                 const avgHipY = (res.poseLandmarks[23].y + res.poseLandmarks[24].y) / 2;
-
-                let isStretching = false;
-                if (mode === "FORWARD") {{
-                    if (noseY > avgHipY + 0.05) isStretching = true;
-                    status.innerText = isStretching ? "Sirene pausiert..." : "TIEFER BEUGEN!";
-                }} else {{
-                    if (avgHipY < noseY - 0.1) isStretching = true;
-                    status.innerText = isStretching ? "Gute Form! Halten..." : "HÜFTE HÖHER! (V-Form)";
-                }}
+                let isStretching = (mode === "FORWARD") ? (noseY > avgHipY + 0.05) : (avgHipY < noseY - 0.1);
 
                 if (isStretching) {{
                     alarm.pause(); stretchMs += dt;
                     let rem = Math.max(0, (30000 - stretchMs) / 1000);
-                    holdTimerDisplay.innerText = rem.toFixed(1);
-                    holdTimerDisplay.style.color = "#4CAF50";
-                    if (stretchMs >= 30000) {{ holdTimerDisplay.innerText = "✓"; status.innerText = "FERTIG!"; }}
+                    document.getElementById('hold-timer').innerText = rem.toFixed(1);
+                    document.getElementById('hold-timer').style.color = "#4CAF50";
+                    document.getElementById('status').innerText = "HALTEN!";
                 }} else {{
                     if (stretchMs < 30000) alarm.play();
-                    holdTimerDisplay.style.color = "#ff4b4b";
+                    document.getElementById('hold-timer').style.color = "#ff4b4b";
+                    document.getElementById('status').innerText = "TIEFER!";
                 }}
             }});
 
-            if (cameraObj) await cameraObj.stop();
-            
             cameraObj = new Camera(video, {{
                 onFrame: async () => {{ await pose.send({{image: video}}); }},
-                width: 1280, height: 720,
-                facingMode: currentFacingMode
+                width: 640, height: 480, facingMode: currentFacingMode
             }});
-            cameraObj.start();
+            cameraObj.start().then(() => {{
+                // Optional: Zoom-Versuch nach Start
+                setTimeout(() => {{
+                    const track = video.srcObject.getVideoTracks()[0];
+                    if (track.getCapabilities().zoom) track.applyConstraints({{advanced: [{{zoom: 0}}]}});
+                }}, 500);
+            }});
         }}
 
         function switchCamera() {{
             currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-            video.style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
+            document.getElementById('vid').style.transform = (currentFacingMode === "user") ? "scaleX(-1)" : "scaleX(1)";
             startCamera();
         }}
     </script>
     """
-    components.html(js_code, height=650)
+    components.html(js_code, height=550)
     if st.button("RESET"):
         st.session_state.phase = "SETUP"
         st.rerun()
